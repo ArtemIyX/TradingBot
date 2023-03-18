@@ -2,12 +2,15 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
 using TradingBot.Data;
 
@@ -39,6 +42,13 @@ internal class TelegramService
         _bot.StartReceiving(Update, Error);
         _logger.LogInformation("Telegram bot started");
         await SendMessageAsync(_telegramConfig.ChatId, "Hello");
+        await SendLong(BinanceCurrency.BTCUSDT, 1000.00m, 1200.00m, 800.00m);
+        await SendTP(true, BinanceCurrency.BTCUSDT, 1000.00m, 1200.00m);
+        await SendSL(true, BinanceCurrency.BTCUSDT, 1000.00m, 850.00m);
+
+        await SendLong(BinanceCurrency.ETHUSDT, 1000.00m, 1200.00m, 800.00m);
+        await SendTP(false, BinanceCurrency.ETHUSDT, 1000.00m, 800.00m);
+        await SendSL(false, BinanceCurrency.ETHUSDT, 1000.00m, 1100.00m);
     }
 
     private async Task Update(ITelegramBotClient botClient, Update update, CancellationToken token)
@@ -47,7 +57,54 @@ internal class TelegramService
         if (message?.Text != null)
             _logger.LogInformation("Telegam message: " + message.Text);
     }
+    
+    private string MakeOpenText(bool buy, BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
+    {
+        string position = buy ? "Long" : "Short";
+        return $"{currency.ToString().ToUpper()} {position}\nВход: {price}\nТейк: {takeProfit}\nСтоп: {stopLoss}";
+    }
 
+    public async Task SendLong(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
+    {
+        await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
+            new InputOnlineFile(new Uri(_telegramConfig.Icons.Long)),
+            parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown,
+            caption: MakeOpenText(true, currency, price, takeProfit, stopLoss));
+    }
+
+    public async Task SendShort(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
+    {
+        await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
+           new InputOnlineFile(new Uri(_telegramConfig.Icons.Short)),
+           parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown,
+           caption: MakeOpenText(false, currency, price, takeProfit, stopLoss));
+    }
+
+    public async Task SendTP(bool buy, BinanceCurrency currency, decimal enterPrice, decimal exitPrice)
+    {
+        decimal priceDifference = buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
+        decimal percentageDifference = (priceDifference / enterPrice) * 100;
+        bool success = buy ? (enterPrice < exitPrice) : (enterPrice > exitPrice);
+        string position = buy ? "Long" : "Short";
+
+        await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
+          new InputOnlineFile(new Uri(_telegramConfig.Icons.TP)),
+          parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown,
+          caption: $"{currency.ToString().ToUpper()} {position} Take Profit\nВход: {enterPrice}\nВыход: {exitPrice}\nПрофит: {percentageDifference}%");
+    }
+
+    public async Task SendSL(bool buy, BinanceCurrency currency, decimal enterPrice, decimal exitPrice)
+    {
+        decimal priceDifference = buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
+        decimal percentageDifference = (priceDifference / enterPrice) * 100;
+        bool success = buy ? (enterPrice < exitPrice) : (enterPrice > exitPrice);
+        string position = buy ? "Long" : "Short";
+
+        await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
+          new InputOnlineFile(new Uri(_telegramConfig.Icons.SL)),
+          parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown,
+          caption: $"{currency.ToString().ToUpper()} {position} Stop Loss\nВход: {enterPrice}\nВыход: {exitPrice}\nПотеря: {percentageDifference}%");
+    }
 
     private async Task SendMessageAsync(long chatId, string message)
     {
