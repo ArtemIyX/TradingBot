@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Collections.Specialized.BitVector32;
 
 namespace TradingBot.Services
 {
@@ -36,14 +37,46 @@ namespace TradingBot.Services
             _tradingViewService.OnStop += TradingView_OnStop;
         }
 
-        private void TradingView_OnAction(object? sender, StrategyAction action)
+        private async Task TradingView_OnAction(object? sender, StrategyAction action)
         {
-            
+            if (action.Buy)
+            {
+                await _binanceService.RequestBuy(action.Currency, action.Price, action.Take, action.Loss);
+                await _telegramBot.SendLong(action.Currency, action.Price, action.Take, action.Loss);
+            }
+            else
+            {
+                await _binanceService.RequestSell(action.Currency, action.Price, action.Take, action.Loss);
+                await _telegramBot.SendShort(action.Currency, action.Price, action.Take, action.Loss);
+            }
         }
 
-        private void TradingView_OnStop(object? sender, StrategyStop action)
+        private async Task TradingView_OnStop(object? sender, StrategyStop stop)
         {
-            
+            if(!_binanceService.HasPosition)
+            {
+                _logger.LogWarning($"Can not stop order: Bot doesnt have open position");
+                return;
+            }
+            if(_binanceService.Buy != stop.Buy)
+            {
+                string name = stop.Buy ? "Buy" : "Sell";
+                _logger.LogWarning($"Can not stop order: Bot doesnt have '{name}' position");
+                return;
+            }
+            decimal exitPrice = stop.Price;
+            decimal enterPrice = _binanceService.Enter;
+            decimal priceDifference = stop.Buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
+            decimal percentageDifference = (priceDifference / enterPrice) * 100;
+            bool isTp = percentageDifference > 0.0m;
+            if(isTp)
+            {
+                await _telegramBot.SendTP(_binanceService.Buy, _binanceService.CurrentCurrency, _binanceService.Enter, stop.Price);
+            }
+            else
+            {
+                await _telegramBot.SendSL(_binanceService.Buy, _binanceService.CurrentCurrency, _binanceService.Enter, stop.Price);
+            }
         }
 
         public async Task Start()
@@ -52,14 +85,13 @@ namespace TradingBot.Services
             _webhookService.WebhookReceived += WebhookReceived;
             _webhookService.StartListeningAsync();
             _telegramBot.Start();
-            _binanceService.TryBuy(BinanceCurrency.BTCUSDT, 0.5m);
             await Task.Delay(-1);
         }
 
         private void WebhookReceived(object? sender, string e)
         {
             _logger.LogInformation($"Webhook received: {e}");
-
+            _tradingViewService.ProcessRequest(e);
         }
 
         public void Finish()

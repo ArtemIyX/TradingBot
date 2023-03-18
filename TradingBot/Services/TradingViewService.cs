@@ -23,11 +23,12 @@ namespace TradingBot.Services
     public struct StrategyStop
     {
         public bool Buy { get; set; }
+        public BinanceCurrency Currency { get; set; }
         public decimal Price { get; set; }
     }
 
-    public delegate void StrategyActionDelegate(object? sender, StrategyAction action);
-    public delegate void StrategyStopDelegate(object? sender, StrategyStop action);
+    public delegate Task StrategyActionDelegate(object? sender, StrategyAction action);
+    public delegate Task StrategyStopDelegate(object? sender, StrategyStop stop);
 
     internal class TradingViewService
     {
@@ -49,13 +50,13 @@ namespace TradingBot.Services
             _logger.LogInformation($"Processing request: {json}");
             try
             {
-                TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json);
+                TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
                 BinanceCurrency currecny = request.Currency.ToBinanceCurrency();
                 if(request.Action == "BUY" || request.Action == "SELL")
                 {
                     bool buy = request.Action == "BUY";
                     JObject data = request.Data as JObject ?? throw new NullReferenceException("Request.Data is null");
-                    TradingViewOpenData priceData = data.ToObject<TradingViewOpenData>();
+                    TradingViewOpenData priceData = data.ToObject<TradingViewOpenData>() ?? throw new Exception("Can not parse request.Data");
                     OnAction?.Invoke(this, new StrategyAction()
                     {
                         Buy = buy,
@@ -71,7 +72,8 @@ namespace TradingBot.Services
                     OnStop.Invoke(this, new StrategyStop()
                     {
                         Buy = buy,
-                        Price = request.Price
+                        Price = request.Price,
+                        Currency = currecny
                     });
                 }
                 else

@@ -76,7 +76,6 @@ internal class TelegramService
     {
         decimal priceDifference = buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
         decimal percentageDifference = (priceDifference / enterPrice) * 100;
-        bool success = buy ? (enterPrice < exitPrice) : (enterPrice > exitPrice);
         string position = buy ? "Long" : "Short";
 
         await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
