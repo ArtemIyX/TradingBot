@@ -41,14 +41,6 @@ internal class TelegramService
         _bot = new TelegramBotClient(_telegramConfig.Key);
         _bot.StartReceiving(Update, Error);
         _logger.LogInformation("Telegram bot started");
-        await SendMessageAsync(_telegramConfig.ChatId, "Hello");
-        await SendLong(BinanceCurrency.BTCUSDT, 1000.00m, 1200.00m, 800.00m);
-        await SendTP(true, BinanceCurrency.BTCUSDT, 1000.00m, 1200.00m);
-        await SendSL(true, BinanceCurrency.BTCUSDT, 1000.00m, 850.00m);
-
-        await SendLong(BinanceCurrency.ETHUSDT, 1000.00m, 1200.00m, 800.00m);
-        await SendTP(false, BinanceCurrency.ETHUSDT, 1000.00m, 800.00m);
-        await SendSL(false, BinanceCurrency.ETHUSDT, 1000.00m, 1100.00m);
     }
 
     private async Task Update(ITelegramBotClient botClient, Update update, CancellationToken token)
