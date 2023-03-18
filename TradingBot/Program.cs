@@ -15,8 +15,7 @@ public static class Programm
     {
         IHost host = AppStartup();
         Application app = ActivatorUtilities.CreateInstance<Application>(host.Services);
-
-        app.Start();
+        await app.Start();
     }
 
     // Define a static method named ConfigSetup to set up the configuration for the application.
@@ -50,6 +49,7 @@ public static class Programm
         IHost host = Host.CreateDefaultBuilder().ConfigureServices((context, services) =>
         {
             services.AddSingleton<Application>();
+            services.AddTransient<WebhookService>();
         }).UseSerilog()
         .Build();
 

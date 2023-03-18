@@ -12,14 +12,34 @@ namespace TradingBot.Services
     {
         private readonly ILogger<Application> _logger;
         private readonly IConfiguration _config;
-        public Application(ILogger<Application> logger, IConfiguration config = null)
+        private readonly WebhookService _webhookService;
+        private readonly CancellationToken cancellationToken;
+
+        public Application(
+            ILogger<Application> logger, 
+            IConfiguration config,
+            WebhookService webhookService)
         {
             _logger = logger;
             _config = config;
+            _webhookService = webhookService;
         }
-        public void Start()
+        public async Task Start()
         {
             _logger.LogInformation("Hello world!");
+            _webhookService.WebhookReceived += WebhookReceived;
+            _webhookService.StartListeningAsync();
+            await Task.Delay(-1);
+        }
+
+        private void WebhookReceived(object? sender, string e)
+        {
+            _logger.LogInformation($"Webhook received: {e}");
+        }
+
+        public void Finish()
+        {
+            _webhookService.StopListeting();
         }
     }
 }
