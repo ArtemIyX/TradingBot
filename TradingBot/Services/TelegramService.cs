@@ -23,12 +23,6 @@ internal class TelegramService
     private readonly ILogger<WebhookService> _logger;
     private TelegramBotClient _bot;
     private TelegramConfig _telegramConfig;
-  /*  private ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup(new[]
-                {
-                    new[] { new KeyboardButton("Option 1"), new KeyboardButton("Option 2") },
-                    new[] { new KeyboardButton("Option 3"), new KeyboardButton("Option 4") },
-                });
-*/
 
     public TelegramService(IConfiguration Config,
                           ILogger<WebhookService> Logger)
@@ -42,8 +36,6 @@ internal class TelegramService
         _bot = new TelegramBotClient(_telegramConfig.Key);
         _bot.StartReceiving(Update, Error);
         _logger.LogInformation("Telegram bot started");
-        await SendLong(BinanceCurrency.AVAXUSDT, 1000, 1200, 900);
-        await SendTP(true, BinanceCurrency.AVAXUSDT, 1000, 1200);
     }
 
     private async Task Update(ITelegramBotClient botClient, Update update, CancellationToken token)
@@ -84,20 +76,12 @@ internal class TelegramService
     {
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
              MakeOpenText(true, currency, price, takeProfit, stopLoss));
-       /* await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
-            new InputOnlineFile(new Uri(_telegramConfig.Icons.Long)),
-            parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown,
-            caption: MakeOpenText(true, currency, price, takeProfit, stopLoss));*/
     }
 
     public async Task SendShort(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
     {
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
              MakeOpenText(false, currency, price, takeProfit, stopLoss));
-/*        await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
-           new InputOnlineFile(new Uri(_telegramConfig.Icons.Short)),
-           parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown,
-           caption: MakeOpenText(false, currency, price, takeProfit, stopLoss));*/
     }
 
     public async Task SendTP(bool buy, BinanceCurrency currency, decimal enterPrice, decimal exitPrice)
@@ -107,11 +91,6 @@ internal class TelegramService
 
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
             MakeTPSLText(buy, true, currency, enterPrice, exitPrice, percentageDifference));
-
-       /* await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
-          new InputOnlineFile(new Uri(_telegramConfig.Icons.TP)),
-          parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown,
-          caption: $"{currency.ToString().ToUpper()} {position} Take Profit\nВход: {enterPrice}\nВыход: {exitPrice}\nПрофит: {percentageDifference}%");*/
     }
 
     public async Task SendSL(bool buy, BinanceCurrency currency, decimal enterPrice, decimal exitPrice)
@@ -123,10 +102,6 @@ internal class TelegramService
 
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
             MakeTPSLText(buy, false, currency, enterPrice, exitPrice, percentageDifference));
-        /*  await _bot.SendPhotoAsync(new ChatId(_telegramConfig.ChatId),
-            new InputOnlineFile(new Uri(_telegramConfig.Icons.SL)),
-            parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown,
-            caption: $"{currency.ToString().ToUpper()} {position} Stop Loss\nВход: {enterPrice}\nВыход: {exitPrice}\nПотеря: {percentageDifference}%");*/
     }
 
     private async Task SendMessageAsync(long chatId, string message)

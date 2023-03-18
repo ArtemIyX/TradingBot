@@ -89,6 +89,7 @@ internal class BinanceService
             };
         }
         _binanceClient = new BinanceClient(clientOption);
+       
     }
 
     // This method retrieves the available balance of USDT in a Binance futures account.
@@ -134,6 +135,10 @@ internal class BinanceService
     // It takes a BinanceCurrency object and a long integer representing the order ID as parameters.
     private async Task TryCloseOrder(BinanceCurrency currency, long order)
     {
+        if (!_binanceConfig.Status)
+        {
+            return;
+        }
         // Log that an order is being canceled
         _logger.LogInformation($"Canceling order '{order}' ({currency.ToString()})");
 
@@ -166,6 +171,10 @@ internal class BinanceService
     // It takes a BinanceCurrency object representing the currency of the order and a boolean indicating whether it was a buy or sell order.
     public void NotifyFinished(BinanceCurrency currency, bool buyPosition)
     {
+        if (!_binanceConfig.Status)
+        {
+            return;
+        }
         // If the currency, buy/sell position, and position status match the current state of the object, update the state and log a message
         if (currency == CurrentCurrency && buyPosition == Buy && HasPosition)
         {
@@ -190,12 +199,20 @@ internal class BinanceService
 
     public async Task RequestOrder(OrderSide side, BinanceCurrency currency, decimal enterPrice, decimal takeProfit, decimal stopLoss)
     {
+        if(!_binanceConfig.Status)
+        {
+            return;
+        }
         // Check if bot already has a position open
         if (HasPosition)
         {
             string buyString = Buy ? "Buy" : "Sell";
             throw new Exception($"Bot already has position: {CurrentCurrency} {buyString}");
         }
+
+        await _binanceClient.UsdFuturesApi.Account.ChangeMarginTypeAsync(currency.ToString(), FuturesMarginType.Isolated);
+        await _binanceClient.UsdFuturesApi.Account.ChangeInitialLeverageAsync(currency.ToString(), leverage: _binanceConfig.Leverage);
+        _logger.LogInformation($"'{currency.ToString()}' Set FuturesMarginType to Isolated, Leverage to {_binanceConfig.Leverage}x");
 
         // Retrieve bot's current balance and calculate trade amount
         decimal balance = await GetUsdtFuturesBalance();

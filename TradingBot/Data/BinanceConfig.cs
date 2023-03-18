@@ -8,6 +8,7 @@ namespace TradingBot.Data
 {
     internal class BinanceConfig
     {
+        public bool Status { get; set; }
         public string ApiKey { get; set; }
         public string SecretKey { get; set; }
         public bool TestNet { get; set; }
