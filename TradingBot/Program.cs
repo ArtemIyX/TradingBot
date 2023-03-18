@@ -50,6 +50,7 @@ public static class Programm
         {
             services.AddSingleton<Application>();
             services.AddTransient<WebhookService>();
+            services.AddTransient<TelegramService>();
         }).UseSerilog()
         .Build();
 
