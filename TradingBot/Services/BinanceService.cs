@@ -191,60 +191,15 @@ internal class BinanceService
 
     public async Task RequestBuy(BinanceCurrency currency, decimal enterPrice, decimal takeProfit, decimal stopLoss)
     {
-        if(HasPosition)
-        {
-            string buyString = Buy ? "Buy" : "Sell";
-            throw new Exception($"Bot already has position: {CurrentCurrency} {buyString}");
-        }
-
-        _logger.LogInformation($"Buy {currency.ToString()}: {enterPrice}, TP: {takeProfit}, SL: {stopLoss}");
-        decimal balance = await GetUsdtFuturesBalance();
-        decimal cost = await GetAvgPrice(currency);
-        Enter = cost;
-        decimal balancePercent = _binanceConfig.Percent * balance;
-        decimal amount = Math.Round(balancePercent / cost, 2);
-
-        takeProfit = Math.Round(takeProfit, 2);
-        stopLoss = Math.Round(stopLoss, 2);
-
-        WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> openPositionResult = 
-            await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(), 
-            OrderSide.Buy, FuturesOrderType.Market, amount);
-
-        OrderId = openPositionResult.Data.Id;
-
-        if (!openPositionResult.Success)
-            throw new Exception(openPositionResult.Error.Message);
-
-        WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> stopLossResult 
-            = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
-            OrderSide.Sell, FuturesOrderType.StopMarket,
-            quantity: null, closePosition: true, stopPrice: stopLoss);
-
-        if(!stopLossResult.Success)
-        {
-            await TryCloseOrder(currency, OrderId);
-            throw new Exception(stopLossResult.Error.Message);
-        }
-
-        WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> takeProfitResult 
-            = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(), 
-            OrderSide.Sell, FuturesOrderType.TakeProfitMarket,
-            quantity: null, closePosition: true, stopPrice: takeProfit);
-
-        if (!takeProfitResult.Success)
-        {
-            await TryCloseOrder(currency, OrderId);
-            throw new Exception(takeProfitResult.Error.Message);
-        }
-
-        CurrentCurrency = currency;
-        Enter = enterPrice;
-        Buy = true;
-        HasPosition = true;
+        await RequestOrder(OrderSide.Buy, currency, enterPrice, takeProfit, stopLoss);
     }
 
     public async Task RequestSell(BinanceCurrency currency, decimal enterPrice, decimal takeProfit, decimal stopLoss)
+    {
+        await RequestOrder(OrderSide.Sell, currency, enterPrice, takeProfit, stopLoss);
+    }
+
+    public async Task RequestOrder(OrderSide side, BinanceCurrency currency, decimal enterPrice, decimal takeProfit, decimal stopLoss)
     {
         if (HasPosition)
         {
@@ -252,7 +207,7 @@ internal class BinanceService
             throw new Exception($"Bot already has position: {CurrentCurrency} {buyString}");
         }
 
-        _logger.LogInformation($"Sell {currency.ToString()}: {enterPrice}, TP: {takeProfit}, SL: {stopLoss}");
+        _logger.LogInformation($"{side.ToString()} {currency.ToString()}: {enterPrice}, TP: {takeProfit}, SL: {stopLoss}");
         decimal balance = await GetUsdtFuturesBalance();
         decimal cost = await GetAvgPrice(currency);
         Enter = cost;
@@ -264,7 +219,7 @@ internal class BinanceService
 
         WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> openPositionResult =
             await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
-            OrderSide.Sell, FuturesOrderType.Market, amount);
+            side, FuturesOrderType.Market, amount);
 
         OrderId = openPositionResult.Data.Id;
 
@@ -273,7 +228,7 @@ internal class BinanceService
 
         WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> stopLossResult
             = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
-            OrderSide.Buy, FuturesOrderType.StopMarket,
+            side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy, FuturesOrderType.StopMarket,
             quantity: null, closePosition: true, stopPrice: stopLoss);
 
         if (!stopLossResult.Success)
@@ -284,7 +239,7 @@ internal class BinanceService
 
         WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> takeProfitResult
             = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
-            OrderSide.Buy, FuturesOrderType.TakeProfitMarket,
+            side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy, FuturesOrderType.TakeProfitMarket,
             quantity: null, closePosition: true, stopPrice: takeProfit);
 
         if (!takeProfitResult.Success)
@@ -295,7 +250,7 @@ internal class BinanceService
 
         CurrentCurrency = currency;
         Enter = enterPrice;
-        Buy = false;
+        Buy = side == OrderSide.Buy;
         HasPosition = true;
     }
 }
