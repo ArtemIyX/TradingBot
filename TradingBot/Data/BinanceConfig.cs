@@ -11,5 +11,6 @@ namespace TradingBot.Data
         public string ApiKey { get; set; }
         public string SecretKey { get; set; }
         public bool TestNet { get; set; }
+        public decimal Percent { get; set; }
     }
 }
