@@ -197,15 +197,16 @@ internal class BinanceService
             throw new Exception($"Bot already has position: {CurrentCurrency} {buyString}");
         }
 
-        // Log trade details
-        _logger.LogInformation($"{side.ToString()} {currency.ToString()}: {enterPrice}, TP: {takeProfit}, SL: {stopLoss}");
-
         // Retrieve bot's current balance and calculate trade amount
         decimal balance = await GetUsdtFuturesBalance();
         decimal cost = await GetAvgPrice(currency);
         Enter = cost;
-        decimal balancePercent = _binanceConfig.Percent * balance;
-        decimal amount = Math.Round(balancePercent / cost, 2);
+        decimal balancePercent = balance * _binanceConfig.Percent ;
+        decimal effectiveBalance = balancePercent * _binanceConfig.Leverage;
+        decimal amount = Math.Round(effectiveBalance / cost, 2);
+
+        // Log trade details
+        _logger.LogInformation($"{side.ToString()} {amount} {currency.ToString()}: {enterPrice}, TP: {takeProfit}, SL: {stopLoss}");
 
         // Round take profit and stop loss prices to 2 decimal places
         takeProfit = Math.Round(takeProfit, 2);

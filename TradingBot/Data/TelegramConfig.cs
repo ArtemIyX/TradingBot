@@ -11,13 +11,6 @@ namespace TradingBot.Data
     {
         public string Key { get; set; }
         public long ChatId { get; set; }
-        public TelegramIcons Icons { get; set; }
-    }
-    internal struct TelegramIcons
-    {
-        public string Long { get; set; }
-        public string Short { get; set; }
-        public string TP { get; set; }
-        public string SL { get; set; }
+        public string[] Emoji { get; set; }
     }
 }

@@ -12,5 +12,6 @@ namespace TradingBot.Data
         public string SecretKey { get; set; }
         public bool TestNet { get; set; }
         public decimal Percent { get; set; }
+        public int Leverage { get; set; }
     }
 }
