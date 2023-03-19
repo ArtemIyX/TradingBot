@@ -52,9 +52,9 @@ internal class TelegramService
         string emoji = buy ? _telegramConfig.Emoji[1] : _telegramConfig.Emoji[0];
         
         return $"{emoji} #{split[0]}/{split[1]} {position}\n" +
-            $"{_telegramConfig.Emoji[4]} Enter: {price}\n" +
-            $"{_telegramConfig.Emoji[5]} TP: {takeProfit}\n" +
-            $"{_telegramConfig.Emoji[6]} SL: {stopLoss}";
+            $"{_telegramConfig.Emoji[4]} Enter: {Math.Round(price, 3)}\n" +
+            $"{_telegramConfig.Emoji[5]} TP: {Math.Round(takeProfit, 3)}\n" +
+            $"{_telegramConfig.Emoji[6]} SL: {Math.Round(stopLoss, 3)}";
     }
 
     private string MakeTPSLText(bool buy, bool tp, BinanceCurrency currency, decimal enter, decimal exit, decimal percentageDifference)
@@ -67,9 +67,9 @@ internal class TelegramService
         string emoji = buy ? _telegramConfig.Emoji[1] : _telegramConfig.Emoji[0];
 
         return $"{emoji} #{split[0]}/{split[1]} {position} {tpString}\n" +
-           $"{_telegramConfig.Emoji[4]} Enter: {enter}\n" +
-           $"{_telegramConfig.Emoji[6]} Exit: {exit}\n" +
-           $"{_telegramConfig.Emoji[2]} {profit}: {percentageDifference}% {smile}";
+           $"{_telegramConfig.Emoji[4]} Enter: {Math.Round(enter, 3)}\n" +
+           $"{_telegramConfig.Emoji[6]} Exit: {Math.Round(exit, 3)}\n" +
+           $"{_telegramConfig.Emoji[2]} {profit}: {Math.Round(percentageDifference, 3)}% {smile}";
     }
 
     public async Task SendLong(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)

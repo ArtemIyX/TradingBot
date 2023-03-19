@@ -118,7 +118,7 @@ internal class BinanceService
 
     // This method asynchronously retrieves the current average price for the specified currency from the Binance API.
     // It takes a BinanceCurrency object as a parameter and returns a decimal value representing the average price.
-    private async Task<decimal> GetAvgPrice(BinanceCurrency currency)
+    public async Task<decimal> GetAvgPrice(BinanceCurrency currency)
     {
         // Call the Binance API to get the current average price for the currency
         var res = await _binanceClient.SpotApi.ExchangeData.GetCurrentAvgPriceAsync(currency.ToString().ToUpper());
@@ -129,6 +129,28 @@ internal class BinanceService
 
         // Otherwise, return the average price as a decimal
         return res.Data.Price;
+    }
+
+    public async Task<(decimal Price, decimal Take, decimal Loss)> CalculateTPSL(BinanceCurrency currency, bool buy, decimal TakePercent, decimal LossPercent)
+    {
+        // Determine where you've entered and in what direction
+       /* longStop = strategy.position_avg_price * (1 - stopPer)
+        shortStop = strategy.position_avg_price * (1 + stopPer)
+        shortTake = strategy.position_avg_price * (1 - takePer)
+        longTake = strategy.position_avg_price * (1 + takePer)*/
+        decimal avgPprice = await GetAvgPrice(currency);
+        if(buy)
+        {
+            decimal longTake = avgPprice * (1 + LossPercent);
+            decimal longStop = avgPprice * (1 - LossPercent);
+            return (Price: avgPprice, Take:longTake, Loss: longStop);
+        }
+        else
+        {
+            decimal shortTake = avgPprice * (1 - TakePercent);
+            decimal shortStop = avgPprice * (1 + LossPercent);
+            return (Price: avgPprice, Take: shortTake, Loss: shortStop);
+        }
     }
 
     // This method asynchronously attempts to cancel an open order for the specified currency and order ID.
@@ -171,10 +193,6 @@ internal class BinanceService
     // It takes a BinanceCurrency object representing the currency of the order and a boolean indicating whether it was a buy or sell order.
     public void NotifyFinished(BinanceCurrency currency, bool buyPosition)
     {
-        if (!_binanceConfig.Status)
-        {
-            return;
-        }
         // If the currency, buy/sell position, and position status match the current state of the object, update the state and log a message
         if (currency == CurrentCurrency && buyPosition == Buy && HasPosition)
         {
@@ -187,88 +205,87 @@ internal class BinanceService
         }
     }
 
-    public async Task RequestBuy(BinanceCurrency currency, decimal enterPrice, decimal takeProfit, decimal stopLoss)
+    public async Task RequestBuy(BinanceCurrency currency, decimal takeProfit, decimal stopLoss)
     {
-        await RequestOrder(OrderSide.Buy, currency, enterPrice, takeProfit, stopLoss);
+        await RequestOrder(OrderSide.Buy, currency, takeProfit, stopLoss);
     }
 
-    public async Task RequestSell(BinanceCurrency currency, decimal enterPrice, decimal takeProfit, decimal stopLoss)
+    public async Task RequestSell(BinanceCurrency currency, decimal takeProfit, decimal stopLoss)
     {
-        await RequestOrder(OrderSide.Sell, currency, enterPrice, takeProfit, stopLoss);
+        await RequestOrder(OrderSide.Sell, currency, takeProfit, stopLoss);
     }
 
-    public async Task RequestOrder(OrderSide side, BinanceCurrency currency, decimal enterPrice, decimal takeProfit, decimal stopLoss)
+    public async Task RequestOrder(OrderSide side, BinanceCurrency currency, decimal takeProfit, decimal stopLoss)
     {
-        if(!_binanceConfig.Status)
-        {
-            return;
-        }
         // Check if bot already has a position open
         if (HasPosition)
         {
             string buyString = Buy ? "Buy" : "Sell";
             throw new Exception($"Bot already has position: {CurrentCurrency} {buyString}");
         }
-
-        await _binanceClient.UsdFuturesApi.Account.ChangeMarginTypeAsync(currency.ToString(), FuturesMarginType.Isolated);
-        await _binanceClient.UsdFuturesApi.Account.ChangeInitialLeverageAsync(currency.ToString(), leverage: _binanceConfig.Leverage);
-        _logger.LogInformation($"'{currency.ToString()}' Set FuturesMarginType to Isolated, Leverage to {_binanceConfig.Leverage}x");
-
-        // Retrieve bot's current balance and calculate trade amount
-        decimal balance = await GetUsdtFuturesBalance();
+       
         decimal cost = await GetAvgPrice(currency);
         Enter = cost;
-        decimal balancePercent = balance * _binanceConfig.Percent ;
-        decimal effectiveBalance = balancePercent * _binanceConfig.Leverage;
-        decimal amount = Math.Round(effectiveBalance / cost, 2);
 
-        // Log trade details
-        _logger.LogInformation($"{side.ToString()} {amount} {currency.ToString()}: {enterPrice}, TP: {takeProfit}, SL: {stopLoss}");
-
-        // Round take profit and stop loss prices to 2 decimal places
-        takeProfit = Math.Round(takeProfit, 2);
-        stopLoss = Math.Round(stopLoss, 2);
-
-        // Place market order using Binance API
-        WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> openPositionResult =
-            await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
-            side, FuturesOrderType.Market, amount);
-        OrderId = openPositionResult.Data.Id;
-
-        // Throw exception if order placement was unsuccessful
-        if (!openPositionResult.Success)
-            throw new Exception(openPositionResult.Error.Message);
-
-        // Place stop loss order using Binance API
-        WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> stopLossResult
-            = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
-            side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy, FuturesOrderType.StopMarket,
-            quantity: null, closePosition: true, stopPrice: stopLoss);
-
-        // If stop loss placement was unsuccessful, try to close the original order and throw exception
-        if (!stopLossResult.Success)
+        if (_binanceConfig.Status)
         {
-            await TryCloseOrder(currency, OrderId);
-            throw new Exception(stopLossResult.Error.Message);
+            await _binanceClient.UsdFuturesApi.Account.ChangeMarginTypeAsync(currency.ToString(), FuturesMarginType.Isolated);
+            await _binanceClient.UsdFuturesApi.Account.ChangeInitialLeverageAsync(currency.ToString(), leverage: _binanceConfig.Leverage);
+            _logger.LogInformation($"'{currency.ToString()}' Set FuturesMarginType to Isolated, Leverage to {_binanceConfig.Leverage}x");
+
+
+            // Retrieve bot's current balance and calculate trade amount
+            decimal balance = await GetUsdtFuturesBalance();
+            decimal balancePercent = balance * _binanceConfig.Percent;
+            decimal effectiveBalance = balancePercent * _binanceConfig.Leverage;
+            decimal amount = Math.Round(effectiveBalance / cost, 2);
+
+            // Log trade details
+            _logger.LogInformation($"{side.ToString()} {amount} {currency.ToString()}: {cost}, TP: {takeProfit}, SL: {stopLoss}");
+
+            // Round take profit and stop loss prices to 2 decimal places
+            takeProfit = Math.Round(takeProfit, 2);
+            stopLoss = Math.Round(stopLoss, 2);
+
+            // Place market order using Binance API
+            WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> openPositionResult =
+                await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
+                side, FuturesOrderType.Market, amount);
+            OrderId = openPositionResult.Data.Id;
+
+            // Throw exception if order placement was unsuccessful
+            if (!openPositionResult.Success)
+                throw new Exception(openPositionResult.Error.Message);
+
+            // Place stop loss order using Binance API
+            WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> stopLossResult
+                = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
+                side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy, FuturesOrderType.StopMarket,
+                quantity: null, closePosition: true, stopPrice: stopLoss);
+
+            // If stop loss placement was unsuccessful, try to close the original order and throw exception
+            if (!stopLossResult.Success)
+            {
+                await TryCloseOrder(currency, OrderId);
+                throw new Exception(stopLossResult.Error.Message);
+            }
+
+            // Place take profit order using Binance API
+            WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> takeProfitResult
+                = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
+                side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy, FuturesOrderType.TakeProfitMarket,
+                quantity: null, closePosition: true, stopPrice: takeProfit);
+
+            // If take profit placement was unsuccessful, try to close the original order and throw exception
+            if (!takeProfitResult.Success)
+            {
+                await TryCloseOrder(currency, OrderId);
+                throw new Exception(takeProfitResult.Error.Message);
+            }
         }
-
-        // Place take profit order using Binance API
-        WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> takeProfitResult
-            = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
-            side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy, FuturesOrderType.TakeProfitMarket,
-            quantity: null, closePosition: true, stopPrice: takeProfit);
-
-        // If take profit placement was unsuccessful, try to close the original order and throw exception
-        if (!takeProfitResult.Success)
-        {
-            await TryCloseOrder(currency, OrderId);
-            throw new Exception(takeProfitResult.Error.Message);
-        }
-
         // Set bot's position to open and update trade details
         CurrentCurrency = currency;
-        Enter = enterPrice;
-        Buy = side == OrderSide.Buy;
+        Buy = (side == OrderSide.Buy);
         HasPosition = true;
     }
 }

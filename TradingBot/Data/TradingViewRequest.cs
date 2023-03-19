@@ -11,15 +11,13 @@ namespace TradingBot.Data
     {
         public string Action { get; set; }
         public string Currency { get; set; }
-        public decimal Price { get; set; }
-        public object? Data { get; set; }   
     }
 
     [Serializable]
     public class TradingViewOpenData
     {
-        public decimal Take { get; set; }
-        public decimal Loss { get;set; }
+        public decimal TakePercent { get; set; }
+        public decimal LossPercent { get;set; }
     }
 }
 

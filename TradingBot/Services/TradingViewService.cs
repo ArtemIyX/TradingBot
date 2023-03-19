@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,7 +16,6 @@ namespace TradingBot.Services
     {
         public bool Buy { get; set; }
         public BinanceCurrency Currency { get; set; }
-        public decimal Price { get; set; }
         public decimal Take { get; set; }
         public decimal Loss { get; set; }
     }
@@ -24,7 +24,6 @@ namespace TradingBot.Services
     {
         public bool Buy { get; set; }
         public BinanceCurrency Currency { get; set; }
-        public decimal Price { get; set; }
     }
 
     public delegate Task StrategyActionDelegate(object? sender, StrategyAction action);
@@ -52,33 +51,34 @@ namespace TradingBot.Services
             {
                 TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
                 BinanceCurrency currecny = request.Currency.ToBinanceCurrency();
-                if(request.Action == "BUY" || request.Action == "SELL")
+               
+                if (request.Action.Contains("BUY_") || request.Action.Contains("SELL_"))
                 {
-                    bool buy = request.Action == "BUY";
-                    JObject data = request.Data as JObject ?? throw new NullReferenceException("Request.Data is null");
-                    TradingViewOpenData priceData = data.ToObject<TradingViewOpenData>() ?? throw new Exception("Can not parse request.Data");
+                    bool buy = request.Action.Contains("BUY_");
+                    string[] substrings = request.Action.Split('_');
+                    CultureInfo culture = CultureInfo.GetCultureInfo("en-US");
+                    decimal takePer = Decimal.Parse(substrings[1], NumberStyles.Any, culture);
+                    decimal stopPer = Decimal.Parse(substrings[2], NumberStyles.Any, culture);
                     OnAction?.Invoke(this, new StrategyAction()
                     {
                         Buy = buy,
                         Currency = currecny,
-                        Price = request.Price,
-                        Take = priceData.Take,
-                        Loss = priceData.Loss
+                        Take = takePer,
+                        Loss = stopPer,
                     });
                 }
-                else if(request.Action == "BUY_TPSL" || request.Action == "SELL_TPSL")
+                else if(request.Action.Contains("L_TPSL") || request.Action.Contains("S_TPSL"))
                 {
-                    bool buy = request.Action == "BUY_TPSL";
+                    bool buy = request.Action.Contains("L_TPSL");
                     OnStop.Invoke(this, new StrategyStop()
                     {
                         Buy = buy,
-                        Price = request.Price,
                         Currency = currecny
                     });
                 }
                 else
                 {
-                    throw new Exception("Unknown Request.Action");
+                    throw new Exception($"Unknown Request.Action ({request.Action})");
                 }
             }
             catch(Exception ex)
