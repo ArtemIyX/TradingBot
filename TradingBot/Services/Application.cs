@@ -39,6 +39,7 @@ namespace TradingBot.Services
 
         private async Task TradingView_OnAction(object? sender, StrategyAction action)
         {
+            _logger.LogInformation($"Trading view action");
             (decimal Price, decimal Take, decimal Loss) calculatedTPSL = 
                 await _binanceService.CalculateTPSL(action.Currency, action.Buy, action.Take, action.Loss);
             if (action.Buy)
@@ -55,7 +56,8 @@ namespace TradingBot.Services
 
         private async Task TradingView_OnStop(object? sender, StrategyStop stop)
         {
-            if(!_binanceService.HasPosition)
+            _logger.LogInformation($"Trading view stop");
+            if (!_binanceService.HasPosition)
             {
                 _logger.LogWarning($"Can not stop order: Bot doesnt have open position");
                 return;
@@ -66,19 +68,30 @@ namespace TradingBot.Services
                 _logger.LogWarning($"Can not stop order: Bot doesnt have '{name}' position");
                 return;
             }
+            if(_binanceService.CurrentCurrency != stop.Currency)
+            {
+                _logger.LogWarning($"Can not stop order: Different currency ({_binanceService.CurrentCurrency} and {stop.Currency})");
+                return;
+            }
             decimal exitPrice = await _binanceService.GetAvgPrice(stop.Currency);
             decimal enterPrice = _binanceService.Enter;
             decimal priceDifference = stop.Buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
             decimal percentageDifference = (priceDifference / enterPrice) * 100;
             bool isTp = percentageDifference > 0.0m;
-            if(isTp)
+
+            TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
+
+            if (isTp)
             {
-                await _telegramBot.SendTP(_binanceService.Buy, _binanceService.CurrentCurrency, enterPrice, exitPrice);
+                await _telegramBot.SendTP(_binanceService.Buy, _binanceService.CurrentCurrency, timeTaken, enterPrice, exitPrice);
             }
             else
             {
-                await _telegramBot.SendSL(_binanceService.Buy, _binanceService.CurrentCurrency, enterPrice, exitPrice);
+                await _telegramBot.SendSL(_binanceService.Buy, _binanceService.CurrentCurrency, timeTaken, enterPrice, exitPrice);
             }
+
+            // Notify binance service
+            _binanceService.NotifyFinished(stop.Currency, stop.Buy);
         }
 
         public async Task Start()

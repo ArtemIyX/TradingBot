@@ -57,7 +57,7 @@ internal class TelegramService
             $"{_telegramConfig.Emoji[6]} SL: {Math.Round(stopLoss, 3)}";
     }
 
-    private string MakeTPSLText(bool buy, bool tp, BinanceCurrency currency, decimal enter, decimal exit, decimal percentageDifference)
+    private string MakeTPSLText(bool buy, bool tp, BinanceCurrency currency, TimeSpan timeTaken, decimal enter, decimal exit, decimal percentageDifference)
     {
         string position = buy ? "Long" : "Short";
         string tpString = tp ? "TP" : "SL";
@@ -66,42 +66,46 @@ internal class TelegramService
         var split = currency.ToString().Split("USDT");
         string emoji = buy ? _telegramConfig.Emoji[1] : _telegramConfig.Emoji[0];
 
-        return $"{emoji} #{split[0]}/{split[1]} {position} {tpString}\n" +
+
+        return $"{emoji} #{split[0]} /{split[1]} {position} {tpString}\n" +
            $"{_telegramConfig.Emoji[4]} Enter: {Math.Round(enter, 3)}\n" +
            $"{_telegramConfig.Emoji[6]} Exit: {Math.Round(exit, 3)}\n" +
-           $"{_telegramConfig.Emoji[2]} {profit}: {Math.Round(percentageDifference, 3)}% {smile}";
+           $"{_telegramConfig.Emoji[2]} {profit}: {Math.Round(percentageDifference, 3)}% {smile}\n" +
+           $"{_telegramConfig.Emoji[7]} Time: {Math.Round(timeTaken.TotalMinutes, 1)}m";
     }
 
     public async Task SendLong(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
     {
+        _logger.LogInformation("Sending Long to telegram");
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
              MakeOpenText(true, currency, price, takeProfit, stopLoss));
     }
 
     public async Task SendShort(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
     {
+        _logger.LogInformation("Sending Short to telegram");
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
              MakeOpenText(false, currency, price, takeProfit, stopLoss));
     }
 
-    public async Task SendTP(bool buy, BinanceCurrency currency, decimal enterPrice, decimal exitPrice)
+    public async Task SendTP(bool buy, BinanceCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
+        _logger.LogInformation("Sending TP to telegram");
         decimal priceDifference = buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
         decimal percentageDifference = (priceDifference / enterPrice) * 100;
 
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
-            MakeTPSLText(buy, true, currency, enterPrice, exitPrice, percentageDifference));
+            MakeTPSLText(buy, true, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
     }
 
-    public async Task SendSL(bool buy, BinanceCurrency currency, decimal enterPrice, decimal exitPrice)
+    public async Task SendSL(bool buy, BinanceCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
+        _logger.LogInformation("Sending SL to telegram");
         decimal priceDifference = buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
         decimal percentageDifference = (priceDifference / enterPrice) * 100;
-        bool success = buy ? (enterPrice < exitPrice) : (enterPrice > exitPrice);
-        string position = buy ? "Long" : "Short";
 
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
-            MakeTPSLText(buy, false, currency, enterPrice, exitPrice, percentageDifference));
+            MakeTPSLText(buy, false, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
     }
 
     private async Task SendMessageAsync(long chatId, string message)

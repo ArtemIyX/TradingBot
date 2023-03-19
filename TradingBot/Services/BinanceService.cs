@@ -62,9 +62,10 @@ internal class BinanceService
 
     public BinanceCurrency CurrentCurrency { get; private set; }
     public bool HasPosition { get; private set; }
-    public bool Buy { get; set; }
-    public decimal Enter { get; set; }
-    public long OrderId { get; set; }
+    public bool Buy { get; private set; }
+    public decimal Enter { get; private set; }
+    public long OrderId { get; private set; }
+    public DateTime OrderStarted { get; set; }
 
     public BinanceService(IConfiguration Config,
                      ILogger<WebhookService> Logger)
@@ -134,22 +135,30 @@ internal class BinanceService
     public async Task<(decimal Price, decimal Take, decimal Loss)> CalculateTPSL(BinanceCurrency currency, bool buy, decimal TakePercent, decimal LossPercent)
     {
         // Determine where you've entered and in what direction
-       /* longStop = strategy.position_avg_price * (1 - stopPer)
-        shortStop = strategy.position_avg_price * (1 + stopPer)
-        shortTake = strategy.position_avg_price * (1 - takePer)
-        longTake = strategy.position_avg_price * (1 + takePer)*/
-        decimal avgPprice = await GetAvgPrice(currency);
-        if(buy)
+        /* longStop = strategy.position_avg_price * (1 - stopPer)
+         shortStop = strategy.position_avg_price * (1 + stopPer)
+         shortTake = strategy.position_avg_price * (1 - takePer)
+         longTake = strategy.position_avg_price * (1 + takePer)*/
+        try
         {
-            decimal longTake = avgPprice * (1 + LossPercent);
-            decimal longStop = avgPprice * (1 - LossPercent);
-            return (Price: avgPprice, Take:longTake, Loss: longStop);
+            decimal avgPprice = await GetAvgPrice(currency);
+            if (buy)
+            {
+                decimal longTake = avgPprice * (1 + LossPercent);
+                decimal longStop = avgPprice * (1 - LossPercent);
+                return (Price: avgPprice, Take: longTake, Loss: longStop);
+            }
+            else
+            {
+                decimal shortTake = avgPprice * (1 - TakePercent);
+                decimal shortStop = avgPprice * (1 + LossPercent);
+                return (Price: avgPprice, Take: shortTake, Loss: shortStop);
+            }
         }
-        else
+        catch(Exception ex)
         {
-            decimal shortTake = avgPprice * (1 - TakePercent);
-            decimal shortStop = avgPprice * (1 + LossPercent);
-            return (Price: avgPprice, Take: shortTake, Loss: shortStop);
+            _logger.LogError(ex.Message);
+            return (0.0m, 0.0m, 0.0m);
         }
     }
 
@@ -196,23 +205,41 @@ internal class BinanceService
         // If the currency, buy/sell position, and position status match the current state of the object, update the state and log a message
         if (currency == CurrentCurrency && buyPosition == Buy && HasPosition)
         {
-            string buyString = Buy ? "Buy" : "Sell";
-            _logger.LogInformation($"Order finished: {CurrentCurrency.ToString()} ({buyString})");
+           
             HasPosition = false;
             CurrentCurrency = BinanceCurrency.None;
             Enter = 0.0m;
             OrderId = 0;
+            OrderStarted = DateTime.MinValue;
+            string buyString = Buy ? "Buy" : "Sell";
+            _logger.LogInformation($"Order finished: {CurrentCurrency.ToString()} ({buyString})");
         }
     }
 
     public async Task RequestBuy(BinanceCurrency currency, decimal takeProfit, decimal stopLoss)
     {
-        await RequestOrder(OrderSide.Buy, currency, takeProfit, stopLoss);
+        _logger.LogInformation($"Requested BUY ({currency.ToString()})");
+        try
+        {
+            await RequestOrder(OrderSide.Buy, currency, takeProfit, stopLoss);
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex.Message);
+        }
     }
 
     public async Task RequestSell(BinanceCurrency currency, decimal takeProfit, decimal stopLoss)
     {
-        await RequestOrder(OrderSide.Sell, currency, takeProfit, stopLoss);
+        _logger.LogInformation($"Requested SELL ({currency.ToString()})");
+        try
+        {
+            await RequestOrder(OrderSide.Sell, currency, takeProfit, stopLoss);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex.Message);
+        }
     }
 
     public async Task RequestOrder(OrderSide side, BinanceCurrency currency, decimal takeProfit, decimal stopLoss)
@@ -229,6 +256,7 @@ internal class BinanceService
 
         if (_binanceConfig.Status)
         {
+            _logger.LogWarning($"Interacting with finances, as the status is ON)");
             await _binanceClient.UsdFuturesApi.Account.ChangeMarginTypeAsync(currency.ToString(), FuturesMarginType.Isolated);
             await _binanceClient.UsdFuturesApi.Account.ChangeInitialLeverageAsync(currency.ToString(), leverage: _binanceConfig.Leverage);
             _logger.LogInformation($"'{currency.ToString()}' Set FuturesMarginType to Isolated, Leverage to {_binanceConfig.Leverage}x");
@@ -241,12 +269,13 @@ internal class BinanceService
             decimal amount = Math.Round(effectiveBalance / cost, 2);
 
             // Log trade details
-            _logger.LogInformation($"{side.ToString()} {amount} {currency.ToString()}: {cost}, TP: {takeProfit}, SL: {stopLoss}");
+            _logger.LogInformation($"Trade: {side.ToString()} {amount} {currency.ToString()}: {cost}, TP: {takeProfit}, SL: {stopLoss}");
 
             // Round take profit and stop loss prices to 2 decimal places
             takeProfit = Math.Round(takeProfit, 2);
             stopLoss = Math.Round(stopLoss, 2);
 
+            _logger.LogWarning($"Placing trade on binance...");
             // Place market order using Binance API
             WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> openPositionResult =
                 await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
@@ -257,6 +286,7 @@ internal class BinanceService
             if (!openPositionResult.Success)
                 throw new Exception(openPositionResult.Error.Message);
 
+            _logger.LogWarning($"Set SL on binance..");
             // Place stop loss order using Binance API
             WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> stopLossResult
                 = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
@@ -270,6 +300,7 @@ internal class BinanceService
                 throw new Exception(stopLossResult.Error.Message);
             }
 
+            _logger.LogWarning($"Set TP on binance..");
             // Place take profit order using Binance API
             WebCallResult<Binance.Net.Objects.Models.Futures.BinanceFuturesPlacedOrder> takeProfitResult
                 = await _binanceClient.UsdFuturesApi.Trading.PlaceOrderAsync(currency.ToString().ToUpper(),
@@ -283,10 +314,15 @@ internal class BinanceService
                 throw new Exception(takeProfitResult.Error.Message);
             }
         }
+        else
+        {
+            _logger.LogWarning($"Do not interact with finances, as the status is OFF)");
+        }
         // Set bot's position to open and update trade details
         CurrentCurrency = currency;
         Buy = (side == OrderSide.Buy);
         HasPosition = true;
+        OrderStarted = DateTime.Now;
     }
 }
 
