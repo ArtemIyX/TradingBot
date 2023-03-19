@@ -205,14 +205,14 @@ internal class BinanceService
         // If the currency, buy/sell position, and position status match the current state of the object, update the state and log a message
         if (currency == CurrentCurrency && buyPosition == Buy && HasPosition)
         {
-           
+            string buyString = Buy ? "Buy" : "Sell";
+            _logger.LogInformation($"Order finished: {CurrentCurrency.ToString()} ({buyString})");
+
             HasPosition = false;
             CurrentCurrency = BinanceCurrency.None;
             Enter = 0.0m;
             OrderId = 0;
             OrderStarted = DateTime.MinValue;
-            string buyString = Buy ? "Buy" : "Sell";
-            _logger.LogInformation($"Order finished: {CurrentCurrency.ToString()} ({buyString})");
         }
     }
 
