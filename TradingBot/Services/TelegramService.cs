@@ -40,11 +40,15 @@ internal class TelegramService
 
     private async Task Update(ITelegramBotClient botClient, Update update, CancellationToken token)
     {
-        Message? message = update.Message;
+       /* Message? message = update.Message;
         if (message?.Text != null)
-            _logger.LogInformation("Telegam message: " + message.Text);
+            _logger.LogInformation("Telegam message: " + message.Text);*/
     }
-    
+    private async Task Error(ITelegramBotClient botClient, Exception ex, CancellationToken token)
+    {
+        //_logger.LogError("Telegram: " + ex.Message);
+    }
+
     private string MakeOpenText(bool buy, BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
     {
         string position = buy ? "Long" : "Short";
@@ -113,9 +117,5 @@ internal class TelegramService
         await _bot.SendTextMessageAsync(new ChatId(chatId), message);
     }
 
-    private Task Error(ITelegramBotClient botClient, Exception ex, CancellationToken token)
-    {
-        _logger.LogError("Telegram: " + ex.Message);
-        return Task.CompletedTask;
-    }
+
 }

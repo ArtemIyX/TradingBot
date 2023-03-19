@@ -57,7 +57,7 @@ internal class BinanceService
 {
     private readonly IConfiguration _config;
     private readonly ILogger<WebhookService> _logger;
-    private readonly BinanceConfig? _binanceConfig;
+    private readonly BinanceConfig _binanceConfig;
     private BinanceClient _binanceClient;
 
     public BinanceCurrency CurrentCurrency { get; private set; }
@@ -264,7 +264,7 @@ internal class BinanceService
 
             // Retrieve bot's current balance and calculate trade amount
             decimal balance = await GetUsdtFuturesBalance();
-            decimal balancePercent = balance * _binanceConfig.Percent;
+            decimal balancePercent = balance * _binanceConfig.OrderSizePercent;
             decimal effectiveBalance = balancePercent * _binanceConfig.Leverage;
             decimal amount = Math.Round(effectiveBalance / cost, 2);
 

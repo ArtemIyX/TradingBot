@@ -33,6 +33,7 @@ namespace TradingBot.Services
     {
         private readonly IConfiguration _config;
         private readonly ILogger<WebhookService> _logger;
+        private readonly BinanceConfig _binanceConfig;
 
         public event StrategyActionDelegate OnAction;
         public event StrategyStopDelegate OnStop;
@@ -42,6 +43,7 @@ namespace TradingBot.Services
         {
             _config = Config;
             _logger = Logger;
+            _binanceConfig = _config.GetSection("Binance").Get<BinanceConfig>();
         }
 
         public void ProcessRequest(string json)
@@ -52,24 +54,20 @@ namespace TradingBot.Services
                 TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
                 BinanceCurrency currecny = request.Currency.ToBinanceCurrency();
                
-                if (request.Action.Contains("BUY_") || request.Action.Contains("SELL_"))
+                if (request.Action == "BUY" || request.Action == "SELL")
                 {
-                    bool buy = request.Action.Contains("BUY_");
-                    string[] substrings = request.Action.Split('_');
-                    CultureInfo culture = CultureInfo.GetCultureInfo("en-US");
-                    decimal takePer = Decimal.Parse(substrings[1], NumberStyles.Any, culture);
-                    decimal stopPer = Decimal.Parse(substrings[2], NumberStyles.Any, culture);
+                    bool buy = request.Action == "BUY";
                     OnAction?.Invoke(this, new StrategyAction()
                     {
                         Buy = buy,
                         Currency = currecny,
-                        Take = takePer,
-                        Loss = stopPer,
+                        Take = _binanceConfig.TakeProfitPercent,
+                        Loss = _binanceConfig.StopLossPercent,
                     });
                 }
-                else if(request.Action.Contains("L_TPSL") || request.Action.Contains("S_TPSL"))
+                else if(request.Action == "L_TPSL" || request.Action == "S_TPSL")
                 {
-                    bool buy = request.Action.Contains("L_TPSL");
+                    bool buy = request.Action == "L_TPSL";
                     OnStop.Invoke(this, new StrategyStop()
                     {
                         Buy = buy,
