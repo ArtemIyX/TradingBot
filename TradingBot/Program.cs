@@ -42,7 +42,6 @@ public static class Programm
         Log.Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(builder.Build())
             .Enrich.FromLogContext()
-            .WriteTo.Console()
             .CreateLogger();
 
         // Create a new instance of the host with the default settings, configure services, add Serilog, and build the host.

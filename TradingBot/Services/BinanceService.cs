@@ -52,6 +52,15 @@ public static class BinanceServiceExtensions
         }
     }
 }
+public struct MonitorResult
+{
+    public BinanceCurrency Currency { get; set; }
+    public bool Take { get; set; }
+    public bool Buy { get; set; }
+    public decimal Price { get; set; }
+}
+
+public delegate Task CurrencyTPSLDelegate(MonitorResult Result);
 
 internal class BinanceService
 {
@@ -66,6 +75,8 @@ internal class BinanceService
     public decimal Enter { get; private set; }
     public long OrderId { get; private set; }
     public DateTime OrderStarted { get; set; }
+
+    public event CurrencyTPSLDelegate TPSLReached;
 
     public BinanceService(IConfiguration Config,
                      ILogger<WebhookService> Logger)
@@ -90,7 +101,55 @@ internal class BinanceService
             };
         }
         _binanceClient = new BinanceClient(clientOption);
+        
        
+    }
+    public async Task StartMonitorTPSL(BinanceCurrency currency, bool buy, decimal take, decimal stop)
+    {
+        _logger.LogInformation("Started TPSL monitor...");
+        MonitorResult result = new MonitorResult();
+        result.Buy = buy;
+        result.Currency = currency;
+        while(true)
+        {
+            decimal current = await GetAvgPrice(currency);
+            _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
+            if (buy)
+            {
+                if(current >= take)
+                {
+                    result.Take = true;
+                    result.Price = current;
+                    TPSLReached?.Invoke(result);
+                    return;
+                }
+                else if(current <= stop)
+                {
+                    result.Take = false;
+                    result.Price = current;
+                    TPSLReached?.Invoke(result);
+                    return;
+                }
+            }
+            else
+            {
+                if(current <= take)
+                {
+                    result.Take = true;
+                    result.Price = current;
+                    TPSLReached?.Invoke(result);
+                    return;
+                }
+                else if(current >= stop)
+                {
+                    result.Take = false;
+                    result.Price = current;
+                    TPSLReached?.Invoke(result);
+                    return;
+                }
+            }
+            await Task.Delay(1000);
+        }
     }
 
     // This method retrieves the available balance of USDT in a Binance futures account.
@@ -218,6 +277,7 @@ internal class BinanceService
 
     public async Task RequestBuy(BinanceCurrency currency, decimal takeProfit, decimal stopLoss)
     {
+        var listenKey = await _binanceClient.UsdFuturesApi.Account.StartUserStreamAsync();
         _logger.LogInformation($"Requested BUY ({currency.ToString()})");
         try
         {

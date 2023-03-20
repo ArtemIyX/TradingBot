@@ -32,24 +32,60 @@ namespace TradingBot.Services
             _webhookService = webhookService;
             _telegramBot = telegramBot;
             _binanceService = binanceService;
+            _binanceService.TPSLReached += BinanceService_TPSLReached;
             _tradingViewService = tradingViewService;
             _tradingViewService.OnAction += TradingView_OnAction;
             _tradingViewService.OnStop += TradingView_OnStop;
         }
 
+        private async Task BinanceService_TPSLReached(MonitorResult result)
+        {
+            string takeProfitStr = result.Take ? "TP" : "SL";
+            string longStr = result.Buy ? "Long" : "Short";
+            _logger.LogInformation($"{takeProfitStr}: {result.Currency} / {longStr} ({result.Price})");
+
+            TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
+            decimal exitPrice = result.Price;
+            decimal enterPrice = _binanceService.Enter;
+            if (result.Take)
+            {
+                await _telegramBot.SendTP(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
+            }
+            else
+            {
+                await _telegramBot.SendSL(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
+            }
+
+            // Notify binance service
+            _binanceService.NotifyFinished(result.Currency, result.Buy);
+        }
+
         private async Task TradingView_OnAction(object? sender, StrategyAction action)
         {
             _logger.LogInformation($"Trading view action");
+
+            if(_binanceService.HasPosition)
+            {
+                _logger.LogWarning("Can not execute action: Bot already has position");
+                return;
+            }
+
             (decimal Price, decimal Take, decimal Loss) calculatedTPSL = 
                 await _binanceService.CalculateTPSL(action.Currency, action.Buy, action.Take, action.Loss);
             if (action.Buy)
             {
                 await _binanceService.RequestBuy(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
+
+                Task monitor =_binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss);
+
                 await _telegramBot.SendLong(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
             }
             else
             {
                 await _binanceService.RequestSell(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
+
+                Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss);
+
                 await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
             }
         }
@@ -57,6 +93,7 @@ namespace TradingBot.Services
         private async Task TradingView_OnStop(object? sender, StrategyStop stop)
         {
             _logger.LogInformation($"Trading view stop");
+            return;
             if (!_binanceService.HasPosition)
             {
                 _logger.LogWarning($"Can not stop order: Bot doesnt have open position");
