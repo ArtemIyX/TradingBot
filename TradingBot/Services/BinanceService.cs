@@ -110,10 +110,17 @@ internal class BinanceService
         MonitorResult result = new MonitorResult();
         result.Buy = buy;
         result.Currency = currency;
+        int i = 1;
+        int need = 20;
         while(true)
         {
             decimal current = await GetAvgPrice(currency);
-            _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
+            i++;
+            if (i == need)
+            {
+                _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
+                i = 1;
+            }
             if (buy)
             {
                 if(current >= take)
@@ -149,6 +156,7 @@ internal class BinanceService
                 }
             }
             await Task.Delay(1000);
+            
         }
     }
 
@@ -203,7 +211,7 @@ internal class BinanceService
             decimal avgPprice = await GetAvgPrice(currency);
             if (buy)
             {
-                decimal longTake = avgPprice * (1 + LossPercent);
+                decimal longTake = avgPprice * (1 + TakePercent);
                 decimal longStop = avgPprice * (1 - LossPercent);
                 return (Price: avgPprice, Take: longTake, Loss: longStop);
             }

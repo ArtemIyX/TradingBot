@@ -88,11 +88,13 @@ namespace TradingBot.Services
 
                 await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
             }
+            _tradingViewService.ApproveRequest();
         }
 
         private async Task TradingView_OnStop(object? sender, StrategyStop stop)
         {
             _logger.LogInformation($"Trading view stop");
+            _tradingViewService.ApproveRequest();
             return;
             if (!_binanceService.HasPosition)
             {
@@ -142,7 +144,6 @@ namespace TradingBot.Services
 
         private void WebhookReceived(object? sender, string e)
         {
-            //_logger.LogInformation($"Webhook received: {e}");
             _tradingViewService.ProcessRequest(e);
         }
 
