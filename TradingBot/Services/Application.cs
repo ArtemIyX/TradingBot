@@ -70,8 +70,8 @@ namespace TradingBot.Services
                 return;
             }
 
-            (decimal Price, decimal Take, decimal Loss) calculatedTPSL = 
-                await _binanceService.CalculateTPSL(action.Currency, action.Buy, action.Take, action.Loss);
+            TPSLResult calculatedTPSL = 
+                await _binanceService.CalculateTPSL(action.Currency, action.Buy, action.Take);
             if (action.Buy)
             {
                 await _binanceService.RequestBuy(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
@@ -88,13 +88,13 @@ namespace TradingBot.Services
 
                 await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
             }
-            _tradingViewService.ApproveRequest();
+            //_tradingViewService.ApproveRequest();
         }
 
         private async Task TradingView_OnStop(object? sender, StrategyStop stop)
         {
             _logger.LogInformation($"Trading view stop");
-            _tradingViewService.ApproveRequest();
+            //_tradingViewService.ApproveRequest();
             return;
             if (!_binanceService.HasPosition)
             {

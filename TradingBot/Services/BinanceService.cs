@@ -1,5 +1,6 @@
 ﻿using Binance.Net.Clients;
 using Binance.Net.Enums;
+using Binance.Net.Interfaces;
 using Binance.Net.Interfaces.Clients;
 using Binance.Net.Objects;
 using CryptoExchange.Net.Authentication;
@@ -58,6 +59,14 @@ public struct MonitorResult
     public bool Take { get; set; }
     public bool Buy { get; set; }
     public decimal Price { get; set; }
+}
+
+public struct TPSLResult
+{
+    public decimal Price { get; set; } 
+    public decimal Take { get; set; } 
+    public decimal Loss { get; set; }
+    public bool Succes { get; set; }
 }
 
 public delegate Task CurrencyTPSLDelegate(MonitorResult Result);
@@ -199,7 +208,7 @@ internal class BinanceService
         return res.Data.Price;
     }
 
-    public async Task<(decimal Price, decimal Take, decimal Loss)> CalculateTPSL(BinanceCurrency currency, bool buy, decimal TakePercent, decimal LossPercent)
+    public async Task<TPSLResult> CalculateTPSL(BinanceCurrency currency, bool buy, decimal TakePercent)
     {
         // Determine where you've entered and in what direction
         /* longStop = strategy.position_avg_price * (1 - stopPer)
@@ -209,23 +218,54 @@ internal class BinanceService
         try
         {
             decimal avgPprice = await GetAvgPrice(currency);
+            WebCallResult<IEnumerable<IBinanceKline>> candlesResult =
+                await _binanceClient.SpotApi.ExchangeData.GetKlinesAsync(currency.ToString(), KlineInterval.FifteenMinutes, limit: 3);
+            if (!candlesResult.Success)
+                throw new Exception(candlesResult.Error.Message);
+
+            IEnumerable<IBinanceKline> candles = candlesResult.Data;
+            decimal sw_high = candles.Max(x => x.HighPrice);
+            decimal sw_low = candles.Min(x => x.LowPrice);
+
+            decimal buyTakeProfit = avgPprice + Math.Abs(avgPprice - sw_low) * TakePercent;
+            decimal sellTakeProfit = avgPprice - Math.Abs(sw_high - avgPprice) * TakePercent;
+
+            decimal actualProfit = buy ? buyTakeProfit : sellTakeProfit;
+            decimal actualLoss = buy ? sw_low : sw_high;
+
+            string label = buy ? "BUY" : "SELL";
+            _logger.LogInformation($"Calculating TPSL for {label}. Price: {avgPprice}, TP: {actualProfit}, SL: {actualLoss}");
+
             if (buy)
             {
-                decimal longTake = avgPprice * (1 + TakePercent);
-                decimal longStop = avgPprice * (1 - LossPercent);
-                return (Price: avgPprice, Take: longTake, Loss: longStop);
+                if (sw_low > avgPprice)
+                {
+                    throw new Exception($"Calculating TPSL for {label} {currency} at {avgPprice}, but recent swing low is {sw_low}");
+                }
             }
             else
             {
-                decimal shortTake = avgPprice * (1 - TakePercent);
-                decimal shortStop = avgPprice * (1 + LossPercent);
-                return (Price: avgPprice, Take: shortTake, Loss: shortStop);
+                if(sw_high < avgPprice)
+                {
+                    throw new Exception($"Calculating TPSL for {label} {currency} at {avgPprice}, but recent swing high is {sw_high}");
+                }  
             }
+            return new TPSLResult()
+            {
+                Price = avgPprice,
+                Take = actualProfit,
+                Loss = actualLoss,
+                Succes = true
+            };
+
         }
         catch(Exception ex)
         {
             _logger.LogError(ex.Message);
-            return (0.0m, 0.0m, 0.0m);
+            return new TPSLResult()
+            {
+                Succes = false
+            };
         }
     }
 

@@ -35,8 +35,8 @@ namespace TradingBot.Services
         private readonly IConfiguration _config;
         private readonly ILogger<WebhookService> _logger;
         private readonly BinanceConfig _binanceConfig;
-        private bool _isProcessingRequest = false;
-        private List<string> _requests = new List<string>();
+        /*private bool _isProcessingRequest = false;
+        private List<string> _requests = new List<string>();*/
 
         public event StrategyActionDelegate OnAction;
         public event StrategyStopDelegate OnStop;
@@ -49,7 +49,7 @@ namespace TradingBot.Services
             _binanceConfig = _config.GetSection("Binance").Get<BinanceConfig>();
         }
 
-        public void ApproveRequest()
+/*        public void ApproveRequest()
         {
             _isProcessingRequest = false;
             if(_requests.Count > 0)
@@ -58,19 +58,12 @@ namespace TradingBot.Services
                 _requests.RemoveAt(_requests.Count - 1);
                 ProcessRequest(json);
             }
-        }
+        }*/
 
         public void ProcessRequest(string json)
         {
             string singleLineJson = json.Replace("\n", "");
-            if(_isProcessingRequest)
-            {
-                _logger.LogWarning($"Request added to queue: {singleLineJson}");
-                _requests.Add(json);
-                return;
-            }
             _logger.LogInformation($"Processing request: {singleLineJson}");
-            _isProcessingRequest = true;
             try
             {
                 TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
@@ -83,8 +76,7 @@ namespace TradingBot.Services
                     {
                         Buy = buy,
                         Currency = currecny,
-                        Take = _binanceConfig.TakeProfitPercent,
-                        Loss = _binanceConfig.StopLossPercent,
+                        Take = _binanceConfig.TakeProfit,
                     });
                 }
                 else if(request.Action == "L_TPSL" || request.Action == "S_TPSL")
@@ -104,7 +96,7 @@ namespace TradingBot.Services
             catch(Exception ex)
             {
                 _logger.LogError(ex.Message);
-                _isProcessingRequest = false;
+                //_isProcessingRequest = false;
             }
         }
     }
