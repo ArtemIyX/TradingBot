@@ -41,6 +41,8 @@ namespace TradingBot.Services
         public event StrategyActionDelegate OnAction;
         public event StrategyStopDelegate OnStop;
 
+        private bool _exucuting = false;
+
         public TradingViewService(IConfiguration Config,
                          ILogger<WebhookService> Logger)
         {
@@ -60,10 +62,19 @@ namespace TradingBot.Services
             }
         }*/
 
+        public void NotifyFinish()
+        {
+            _exucuting = false;
+        }
+
         public void ProcessRequest(string json)
         {
-            string singleLineJson = json.Replace("\n", "");
-            _logger.LogInformation($"Processing request: {singleLineJson}");
+            _logger.LogInformation($"Request: {json}");
+            if (_exucuting)
+            {
+                _logger.LogError("Can not process request, already have open reqeust");
+                return;
+            }
             try
             {
                 TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
@@ -72,6 +83,7 @@ namespace TradingBot.Services
                 if (request.Action == "BUY" || request.Action == "SELL")
                 {
                     bool buy = request.Action == "BUY";
+                    _exucuting = true;
                     OnAction?.Invoke(this, new StrategyAction()
                     {
                         Buy = buy,
@@ -82,6 +94,7 @@ namespace TradingBot.Services
                 else if(request.Action == "L_TPSL" || request.Action == "S_TPSL")
                 {
                     bool buy = request.Action == "L_TPSL";
+                    _exucuting = true;
                     OnStop.Invoke(this, new StrategyStop()
                     {
                         Buy = buy,
@@ -96,7 +109,7 @@ namespace TradingBot.Services
             catch(Exception ex)
             {
                 _logger.LogError(ex.Message);
-                //_isProcessingRequest = false;
+                _exucuting = true;
             }
         }
     }

@@ -19,6 +19,7 @@ namespace TradingBot.Services
         private readonly TradingViewService _tradingViewService;
         private readonly CancellationToken cancellationToken;
 
+
         public Application(
             ILogger<Application> logger, 
             IConfiguration config,
@@ -67,6 +68,7 @@ namespace TradingBot.Services
             if(_binanceService.HasPosition)
             {
                 _logger.LogWarning("Can not execute action: Bot already has position");
+                _tradingViewService.NotifyFinish();
                 return;
             }
 
@@ -88,13 +90,13 @@ namespace TradingBot.Services
 
                 await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
             }
-            //_tradingViewService.ApproveRequest();
+            _tradingViewService.NotifyFinish();
         }
 
         private async Task TradingView_OnStop(object? sender, StrategyStop stop)
         {
             _logger.LogInformation($"Trading view stop");
-            //_tradingViewService.ApproveRequest();
+            _tradingViewService.NotifyFinish();
             return;
             if (!_binanceService.HasPosition)
             {

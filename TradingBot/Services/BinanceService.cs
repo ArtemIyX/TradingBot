@@ -219,7 +219,7 @@ internal class BinanceService
         {
             decimal avgPprice = await GetAvgPrice(currency);
             WebCallResult<IEnumerable<IBinanceKline>> candlesResult =
-                await _binanceClient.SpotApi.ExchangeData.GetKlinesAsync(currency.ToString(), KlineInterval.FiveMinutes, limit: 3);
+                await _binanceClient.SpotApi.ExchangeData.GetKlinesAsync(currency.ToString(), KlineInterval.FiveMinutes, limit: 2);
             if (!candlesResult.Success)
                 throw new Exception(candlesResult.Error.Message);
 
