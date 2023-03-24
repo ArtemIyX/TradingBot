@@ -9,6 +9,7 @@ namespace TradingBot.Data
     internal struct BinanceConfig
     {
         public bool Status { get; set; }
+        public int SwingLen { get; set; }
         public decimal TakeProfit { get; set; }
         public string ApiKey { get; set; }
         public string SecretKey { get; set; }
