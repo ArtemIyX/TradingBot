@@ -52,7 +52,7 @@ internal class TelegramService
     private string MakeOpenText(bool buy, BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
     {
         string position = buy ? "Long" : "Short";
-        var split = currency.ToString().Split("USDT");
+        string[] split = currency.ToString().Split("USDT");
         string emoji = buy ? _telegramConfig.Emoji[1] : _telegramConfig.Emoji[0];
         
         return $"{emoji} #{split[0]}/{split[1]} {position}\n" +
