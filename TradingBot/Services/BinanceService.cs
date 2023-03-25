@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using RestSharp;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -443,6 +444,47 @@ public static class BinanceServiceExtensions
             return BinanceCurrency.None;
         }
     }
+
+    public static string ConvertKlineIntervalToString(KlineInterval interval)
+    {
+        switch (interval)
+        {
+            case KlineInterval.OneSecond:
+                return "1s";
+            case KlineInterval.OneMinute:
+                return "1m";
+            case KlineInterval.ThreeMinutes:
+                return "3m";
+            case KlineInterval.FiveMinutes:
+                return "5m";
+            case KlineInterval.FifteenMinutes:
+                return "15m";
+            case KlineInterval.ThirtyMinutes:
+                return "30m";
+            case KlineInterval.OneHour:
+                return "1h";
+            case KlineInterval.TwoHour:
+                return "2h";
+            case KlineInterval.FourHour:
+                return "4h";
+            case KlineInterval.SixHour:
+                return "6h";
+            case KlineInterval.EightHour:
+                return "8h";
+            case KlineInterval.TwelveHour:
+                return "12h";
+            case KlineInterval.OneDay:
+                return "1d";
+            case KlineInterval.ThreeDay:
+                return "3d";
+            case KlineInterval.OneWeek:
+                return "1w";
+            case KlineInterval.OneMonth:
+                return "1M";
+            default:
+                throw new ArgumentOutOfRangeException(nameof(interval), interval, null);
+        }
+    }
 }
 public struct MonitorResult
 {
@@ -458,6 +500,17 @@ public struct TPSLResult
     public decimal Take { get; set; } 
     public decimal Loss { get; set; }
     public bool Succes { get; set; }
+}
+
+public struct BinanceCandlestickData
+{
+    public long OpenTime { get; set; }
+    public decimal Open { get; set; }
+    public decimal High { get; set; }
+    public decimal Low { get; set; }
+    public decimal Close { get; set; }
+    public decimal Volume { get; set; }
+    public long CloseTime { get; set; }
 }
 
 public delegate Task CurrencyTPSLDelegate(MonitorResult Result);
@@ -603,6 +656,45 @@ internal class BinanceService
         return data.price;
     }
 
+    
+
+    public async Task<List<BinanceCandlestickData>> GetRecentCandles(BinanceCurrency currency, KlineInterval interval, int limit)
+    {
+        string symbol = currency.ToString().ToUpper();
+        string inter = BinanceServiceExtensions.ConvertKlineIntervalToString(interval);
+        
+        string apiUrl = $"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={inter}&limit={limit}";
+        List<BinanceCandlestickData> res = new List<BinanceCandlestickData>();
+        using (var httpClient = new HttpClient())
+        {
+            var response = await httpClient.GetAsync(apiUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var data = JsonConvert.DeserializeObject<object[][]>(json);
+                CultureInfo culture = CultureInfo.InvariantCulture;
+                foreach (var candle in data)
+                {
+                   res.Add(new BinanceCandlestickData{
+                        OpenTime = (long)candle[0],
+                        Open = decimal.Parse((string)candle[1], NumberStyles.Number, culture),
+                        High = decimal.Parse((string)candle[2], NumberStyles.Number, culture),
+                        Low = decimal.Parse((string)candle[3], NumberStyles.Number, culture),
+                        Close = decimal.Parse((string)candle[4], NumberStyles.Number, culture),
+                        Volume = decimal.Parse((string)candle[5], NumberStyles.Number, culture),
+                        CloseTime = (long)candle[6]
+                    });
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Error: {response.StatusCode}");
+            }
+        }
+        return res;
+    }
+
     public async Task<TPSLResult> CalculateTPSL(BinanceCurrency currency, bool buy, decimal TakePercent)
     {
         // Determine where you've entered and in what direction
@@ -613,16 +705,11 @@ internal class BinanceService
         try
         {
             decimal avgPprice = await GetAvgPrice(currency);
-            WebCallResult<IEnumerable<IBinanceKline>> candlesResult =
-                await _binanceClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(currency.ToString(), 
-                    (KlineInterval)_binanceConfig.KlinePeriod, limit: _binanceConfig.SwingLen);
 
-            if (!candlesResult.Success)
-                throw new Exception(candlesResult.Error.Message);
+            var candles = await GetRecentCandles(currency, (KlineInterval)_binanceConfig.KlinePeriod, _binanceConfig.SwingLen);
 
-            IEnumerable<IBinanceKline> candles = candlesResult.Data;
-            decimal sw_high = candles.Max(x => x.HighPrice);
-            decimal sw_low = candles.Min(x => x.LowPrice);
+            decimal sw_high = candles.Max(x => x.High);
+            decimal sw_low = candles.Min(x => x.Low);
 
             decimal buyTakeProfit = avgPprice + Math.Abs(avgPprice - sw_low) * TakePercent;
             decimal sellTakeProfit = avgPprice - Math.Abs(sw_high - avgPprice) * TakePercent;
