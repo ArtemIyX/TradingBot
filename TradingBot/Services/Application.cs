@@ -74,21 +74,24 @@ namespace TradingBot.Services
 
             TPSLResult calculatedTPSL = 
                 await _binanceService.CalculateTPSL(action.Currency, action.Buy, action.Take);
-            if (action.Buy)
+            if (calculatedTPSL.Succes)
             {
-                await _binanceService.RequestBuy(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
+                if (action.Buy)
+                {
+                    await _binanceService.RequestBuy(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
 
-                Task monitor =_binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss);
+                    Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss);
 
-                await _telegramBot.SendLong(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
-            }
-            else
-            {
-                await _binanceService.RequestSell(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
+                    await _telegramBot.SendLong(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
+                }
+                else
+                {
+                    await _binanceService.RequestSell(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
 
-                Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss);
+                    Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss);
 
-                await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
+                    await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
+                }
             }
             _tradingViewService.NotifyFinish();
         }

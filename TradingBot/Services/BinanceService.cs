@@ -4,9 +4,12 @@ using Binance.Net.Interfaces;
 using Binance.Net.Interfaces.Clients;
 using Binance.Net.Objects;
 using CryptoExchange.Net.Authentication;
+using CryptoExchange.Net.Interfaces;
 using CryptoExchange.Net.Objects;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using RestSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -508,14 +511,14 @@ internal class BinanceService
         result.Buy = buy;
         result.Currency = currency;
         int i = 1;
-        int need = 20;
+        int need = 5;
         while(true)
         {
             decimal current = await GetAvgPrice(currency);
             i++;
+            _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
             if (i == need)
             {
-                _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
                 i = 1;
             }
             if (buy)
@@ -586,14 +589,18 @@ internal class BinanceService
     public async Task<decimal> GetAvgPrice(BinanceCurrency currency)
     {
         // Call the Binance API to get the current average price for the currency
-        var res = await _binanceClient.SpotApi.ExchangeData.GetCurrentAvgPriceAsync(currency.ToString().ToUpper());
+        //var res = await _binanceClient.UsdFuturesApi.ExchangeData.GetPriceAsync(currency.ToString().ToUpper());
+        //var res = await _binanceClient.SpotApi.ExchangeData.GetCurrentAvgPriceAsync(currency.ToString().ToUpper());
+        //var res = await _binanceClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(currency.ToString(),
+        //            (KlineInterval)_binanceConfig.KlinePeriod, limit: 1);
+        var client = new RestClient("https://fapi.binance.com");
+        var request = new RestRequest("/fapi/v1/ticker/price", Method.Get);
+        request.AddParameter("symbol", currency.ToString().ToUpper());
 
-        // If the API call was unsuccessful, throw an exception with the error message
-        if (!res.Success)
-            throw new Exception(res.Error.Message);
-
-        // Otherwise, return the average price as a decimal
-        return res.Data.Price;
+        RestResponse response = await client.ExecuteAsync(request);
+        dynamic data = JsonConvert.DeserializeObject<dynamic>(response.Content ?? throw new Exception("Can not get Content from price request")) 
+            ?? throw new Exception("Can not parse json from price response");
+        return data.price;
     }
 
     public async Task<TPSLResult> CalculateTPSL(BinanceCurrency currency, bool buy, decimal TakePercent)
@@ -607,7 +614,7 @@ internal class BinanceService
         {
             decimal avgPprice = await GetAvgPrice(currency);
             WebCallResult<IEnumerable<IBinanceKline>> candlesResult =
-                await _binanceClient.SpotApi.ExchangeData.GetKlinesAsync(currency.ToString(), 
+                await _binanceClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(currency.ToString(), 
                     (KlineInterval)_binanceConfig.KlinePeriod, limit: _binanceConfig.SwingLen);
 
             if (!candlesResult.Success)
@@ -814,7 +821,7 @@ internal class BinanceService
         }
         else
         {
-            _logger.LogWarning($"Do not interact with finances, as the status is OFF)");
+            _logger.LogWarning($"Do not interact with finances, as the status is OFF");
         }
         // Set bot's position to open and update trade details
         CurrentCurrency = currency;

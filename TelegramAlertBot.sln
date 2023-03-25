@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot", "TradingBot\Tr
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DevTest", "DevTest\DevTest.vcxproj", "{FBDBB576-E7BB-4724-A687-8C3E13E323EF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BinanceTest", "BinanceTest\BinanceTest.csproj", "{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{FBDBB576-E7BB-4724-A687-8C3E13E323EF}.Release|x64.Build.0 = Release|x64
 		{FBDBB576-E7BB-4724-A687-8C3E13E323EF}.Release|x86.ActiveCfg = Release|Win32
 		{FBDBB576-E7BB-4724-A687-8C3E13E323EF}.Release|x86.Build.0 = Release|Win32
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Debug|x64.Build.0 = Debug|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Debug|x86.Build.0 = Debug|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Release|x64.ActiveCfg = Release|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Release|x64.Build.0 = Release|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Release|x86.ActiveCfg = Release|Any CPU
+		{CDCD9C24-3A5D-4E6E-BA0D-BF182DC3B0FE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
