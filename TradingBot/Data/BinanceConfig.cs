@@ -10,6 +10,7 @@ namespace TradingBot.Data
     {
         public bool Status { get; set; }
         public int SwingLen { get; set; }
+        public int KlinePeriod { get; set; }
         public decimal TakeProfit { get; set; }
         public string ApiKey { get; set; }
         public string SecretKey { get; set; }

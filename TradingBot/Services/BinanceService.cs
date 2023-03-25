@@ -24,6 +24,7 @@ public enum BinanceCurrency
     ETHUSDT,
     NEOUSDT,
     BNBUSDT,
+    BNXUSDT,
     QTUMUSDT,
     EOSUSDT,
     SNTUSDT,
@@ -327,6 +328,7 @@ public enum BinanceCurrency
     BURGERUSDT,
     BAKEUSDT,
     FLMUSDT,
+    FLOWUSDT,
     SCRTUSDT,
     XVSUSDT,
     CAKEUSDT,
@@ -417,6 +419,10 @@ public enum BinanceCurrency
     DEGOUSDT,
     BIFIUSDT,
     LINAUSDT,
+    OPUSDT,
+    LQTYUSDT,
+    MASKUSDT,
+    CFXUSDT,
     None
 }
 
@@ -601,7 +607,9 @@ internal class BinanceService
         {
             decimal avgPprice = await GetAvgPrice(currency);
             WebCallResult<IEnumerable<IBinanceKline>> candlesResult =
-                await _binanceClient.SpotApi.ExchangeData.GetKlinesAsync(currency.ToString(), KlineInterval.FiveMinutes, limit: _binanceConfig.SwingLen);
+                await _binanceClient.SpotApi.ExchangeData.GetKlinesAsync(currency.ToString(), 
+                    (KlineInterval)_binanceConfig.KlinePeriod, limit: _binanceConfig.SwingLen);
+
             if (!candlesResult.Success)
                 throw new Exception(candlesResult.Error.Message);
 
