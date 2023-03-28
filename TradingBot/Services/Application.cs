@@ -121,6 +121,7 @@ namespace TradingBot.Services
                                 Currency = action.Currency,
                                 Take = action.Take,
                             });
+                            return;
                         }
                         else
                         {
@@ -132,6 +133,7 @@ namespace TradingBot.Services
                                 Loss = strategyAdvancedAction.Loss,
                                 PipSize = strategyAdvancedAction.PipSize
                             });
+                            return;
                         }
                     }
                     // Doesnt have any position
