@@ -87,7 +87,7 @@ namespace TradingBot.Services
                         Take = _binanceConfig.TakeProfit,
                     });
                 }
-                else if(request.Action == "L_TPSL" || request.Action == "S_TPSL")
+                /*else if(request.Action == "L_TPSL" || request.Action == "S_TPSL")
                 {
                     bool buy = request.Action == "L_TPSL";
                     _exucuting = true;
@@ -96,7 +96,7 @@ namespace TradingBot.Services
                         Buy = buy,
                         Currency = currecny
                     });
-                }
+                }*/
                 else
                 {
                     throw new Exception($"Unknown Request.Action ({request.Action})");
