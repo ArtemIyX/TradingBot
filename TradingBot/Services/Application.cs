@@ -69,7 +69,8 @@ namespace TradingBot.Services
         {
             _logger.LogInformation($"Trading view action");
 
-            if(_binanceService.HasPosition && _b)
+            // If we can not cancel and we HAVE position - we can not do anytthing
+            if(_binanceService.HasPosition && !_botConfig.Cancel)
             {
                 _logger.LogWarning("Can not execute action: Bot already has position");
                 _tradingViewService.NotifyFinish();
