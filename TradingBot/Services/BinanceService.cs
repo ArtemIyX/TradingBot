@@ -568,7 +568,7 @@ internal class BinanceService
         result.Currency = currency;
         int i = 1;
         int need = 3;
-        var print = (decimal currenctPrice) =>
+        Action<decimal> print = (decimal currenctPrice) =>
         {
             Console.Clear();
             _logger.LogInformation($"Monitoring {currency}: {currenctPrice} (TP: {take}, SP: {stop})");
@@ -579,7 +579,7 @@ internal class BinanceService
             i++;
             if (i == need)
             {
-                
+                print(current);
                 i = 1;
             }
             if (buy)
@@ -588,7 +588,7 @@ internal class BinanceService
                 {
                     result.Take = true;
                     result.Price = current;
-                    _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
+                    print(current);
                     TPSLReached?.Invoke(result);
                     return;
                 }
@@ -596,7 +596,7 @@ internal class BinanceService
                 {
                     result.Take = false;
                     result.Price = current;
-                    _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
+                    print(current);
                     TPSLReached?.Invoke(result);
                     return;
                 }
@@ -607,7 +607,7 @@ internal class BinanceService
                 {
                     result.Take = true;
                     result.Price = current;
-                    _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
+                    print(current);
                     TPSLReached?.Invoke(result);
                     return;
                 }
@@ -615,7 +615,7 @@ internal class BinanceService
                 {
                     result.Take = false;
                     result.Price = current;
-                    _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
+                    print(current);
                     TPSLReached?.Invoke(result);
                     return;
                 }

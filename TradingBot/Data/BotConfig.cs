@@ -7,8 +7,9 @@ using System.Threading.Tasks;
 namespace TradingBot.Data
 {
     [Serializable]
-    internal class BotConfig
+    internal struct BotConfig
     {
-        public string Url { get; set; }
+        public string WebhookUrl { get; set; }
+        public string SecretKey { get; set; }
     }
 }

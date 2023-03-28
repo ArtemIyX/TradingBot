@@ -16,6 +16,7 @@ class WebhookService
 
     private readonly IConfiguration _config;
     private readonly ILogger<WebhookService> _logger;
+    private readonly BotConfig _botConfig;
     private HttpListener _httpListener;
 
     public WebhookService(IConfiguration Config,
@@ -23,15 +24,16 @@ class WebhookService
     {
         _config = Config;
         _logger = Logger;
+        _botConfig = _config.GetSection("Webhook").Get<BotConfig>();
     }
 
     public async Task StartListeningAsync()
     {
         // Create an HTTP listener object and start it
         _httpListener = new HttpListener();
-        BotConfig botConfig = _config.GetSection("Webhook").Get<BotConfig>();
-        _logger.LogInformation($"Listening for webhooks on {botConfig.WebhookUrl}...");
-        _httpListener.Prefixes.Add(botConfig.WebhookUrl);
+        
+        _logger.LogInformation($"Listening for webhooks on {_botConfig.WebhookUrl}...");
+        _httpListener.Prefixes.Add(_botConfig.WebhookUrl);
         _httpListener.Start();
 
         while (_httpListener.IsListening)
