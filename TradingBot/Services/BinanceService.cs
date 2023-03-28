@@ -567,14 +567,19 @@ internal class BinanceService
         result.Buy = buy;
         result.Currency = currency;
         int i = 1;
-        int need = 5;
+        int need = 3;
+        var print = (decimal currenctPrice) =>
+        {
+            Console.Clear();
+            _logger.LogInformation($"Monitoring {currency}: {currenctPrice} (TP: {take}, SP: {stop})");
+        };
         while(true)
         {
             decimal current = await GetAvgPrice(currency);
             i++;
-            _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
             if (i == need)
             {
+                
                 i = 1;
             }
             if (buy)
@@ -583,6 +588,7 @@ internal class BinanceService
                 {
                     result.Take = true;
                     result.Price = current;
+                    _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
                     TPSLReached?.Invoke(result);
                     return;
                 }
@@ -590,6 +596,7 @@ internal class BinanceService
                 {
                     result.Take = false;
                     result.Price = current;
+                    _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
                     TPSLReached?.Invoke(result);
                     return;
                 }
@@ -600,6 +607,7 @@ internal class BinanceService
                 {
                     result.Take = true;
                     result.Price = current;
+                    _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
                     TPSLReached?.Invoke(result);
                     return;
                 }
@@ -607,12 +615,12 @@ internal class BinanceService
                 {
                     result.Take = false;
                     result.Price = current;
+                    _logger.LogInformation($"Monitoring {currency}: {current} (TP: {take}, SP: {stop})");
                     TPSLReached?.Invoke(result);
                     return;
                 }
             }
             await Task.Delay(1000);
-            
         }
     }
 
