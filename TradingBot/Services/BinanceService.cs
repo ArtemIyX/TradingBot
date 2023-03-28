@@ -427,6 +427,9 @@ public enum BinanceCurrency
     LQTYUSDT,
     MASKUSDT,
     CFXUSDT,
+    GTCUSDT,
+    ARBUSDT,
+    LPTUSDT,
     None
 }
 

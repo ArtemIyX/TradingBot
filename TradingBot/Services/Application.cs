@@ -48,6 +48,9 @@ namespace TradingBot.Services
             TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
             decimal exitPrice = result.Price;
             decimal enterPrice = _binanceService.Enter;
+
+            // Notify binance service
+            _binanceService.NotifyFinished(result.Currency, result.Buy);
             if (result.Take)
             {
                 await _telegramBot.SendTP(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
@@ -57,8 +60,7 @@ namespace TradingBot.Services
                 await _telegramBot.SendSL(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
 
-            // Notify binance service
-            _binanceService.NotifyFinished(result.Currency, result.Buy);
+           
         }
 
         private async Task TradingView_OnAction(object? sender, StrategyAction action)
