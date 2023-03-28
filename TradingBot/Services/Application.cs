@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TradingBot.Data;
 using static System.Collections.Specialized.BitVector32;
 
 namespace TradingBot.Services
@@ -17,7 +18,8 @@ namespace TradingBot.Services
         private readonly TelegramService _telegramBot;
         private readonly BinanceService _binanceService;
         private readonly TradingViewService _tradingViewService;
-        private readonly CancellationTokenSource _monitorSource;
+        private readonly BotConfig _botConfig;
+        private CancellationTokenSource _monitorSource;
 
 
         public Application(
@@ -31,6 +33,7 @@ namespace TradingBot.Services
             _monitorSource = new CancellationTokenSource();
             _logger = logger;
             _config = config;
+            _botConfig = _config.GetSection("Bot").Get<BotConfig>();
             _webhookService = webhookService;
             _telegramBot = telegramBot;
             _binanceService = binanceService;
@@ -60,20 +63,18 @@ namespace TradingBot.Services
             {
                 await _telegramBot.SendSL(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
-
-           
         }
 
         private async Task TradingView_OnAction(object? sender, StrategyAction action)
         {
             _logger.LogInformation($"Trading view action");
 
-            /*if(_binanceService.HasPosition)
+            if(_binanceService.HasPosition && _b)
             {
                 _logger.LogWarning("Can not execute action: Bot already has position");
                 _tradingViewService.NotifyFinish();
                 return;
-            }*/
+            }
 
 
             TPSLResult calculatedTPSL = 
@@ -93,18 +94,28 @@ namespace TradingBot.Services
                     // Has SELL position with same currency
                     else if(_binanceService.HasPosition && (!_binanceService.Buy) && _binanceService.CurrentCurrency == action.Currency)
                     {
-                        //TODO: Close BUY Position by market price
+                        //Close SELL Position by market price
 
                         _monitorSource.Cancel();
                         await _binanceService.ClosePosition();
                         _binanceService.NotifyFinished(action.Currency, false);
                         await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTPSL.Price);
+
+                        //Open BUY Position
+                        await TradingView_OnAction(sender, new StrategyAction()
+                        {
+                            Buy = true,
+                            Currency = action.Currency,
+                            Take = action.Take,
+                            Loss = action.Loss
+                        });
                     }
                     // Doesnt have any position
                     else if (!_binanceService.HasPosition)
                     {
                         await _binanceService.RequestBuy(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
 
+                        _monitorSource = new CancellationTokenSource();
                         Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss, _monitorSource.Token);
 
                         await _telegramBot.SendLong(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
@@ -125,17 +136,27 @@ namespace TradingBot.Services
                     // Has BUY position with same currency
                     else if (_binanceService.HasPosition && _binanceService.Buy && _binanceService.CurrentCurrency == action.Currency)
                     {
-                        //TODO: Close SELL Position by market price
+                        //Close BUY Position by market price
                         _monitorSource.Cancel();
                         await _binanceService.ClosePosition();
                         _binanceService.NotifyFinished(action.Currency, true);
                         await _telegramBot.SendCancel(true, action.Currency, timeTaken, entered, calculatedTPSL.Price);
+
+                        //Open SELL Position
+                        await TradingView_OnAction(sender, new StrategyAction()
+                        {
+                            Buy = false,
+                            Currency = action.Currency,
+                            Take = action.Take,
+                            Loss = action.Loss
+                        });
                     }
                     // Doesnt have any position
                     else if (!_binanceService.HasPosition)
                     {
                         await _binanceService.RequestSell(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
 
+                        _monitorSource = new CancellationTokenSource();
                         Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss, _monitorSource.Token);
 
                         await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);

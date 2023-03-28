@@ -11,5 +11,6 @@ namespace TradingBot.Data
     {
         public string WebhookUrl { get; set; }
         public string SecretKey { get; set; }
+        public bool Cancel { get; set; }
     }
 }
