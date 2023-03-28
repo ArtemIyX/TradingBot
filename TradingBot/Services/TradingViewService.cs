@@ -35,8 +35,8 @@ namespace TradingBot.Services
         private readonly IConfiguration _config;
         private readonly ILogger<WebhookService> _logger;
         private readonly BinanceConfig _binanceConfig;
-        /*private bool _isProcessingRequest = false;
-        private List<string> _requests = new List<string>();*/
+        private readonly BotConfig _botConfig;
+
 
         public event StrategyActionDelegate OnAction;
         public event StrategyStopDelegate OnStop;
@@ -49,18 +49,9 @@ namespace TradingBot.Services
             _config = Config;
             _logger = Logger;
             _binanceConfig = _config.GetSection("Binance").Get<BinanceConfig>();
+            _botConfig = _config.GetSection("Bot").Get<BotConfig>();
         }
 
-/*        public void ApproveRequest()
-        {
-            _isProcessingRequest = false;
-            if(_requests.Count > 0)
-            {
-                string json = _requests.Last();
-                _requests.RemoveAt(_requests.Count - 1);
-                ProcessRequest(json);
-            }
-        }*/
 
         public void NotifyFinish()
         {
@@ -79,7 +70,12 @@ namespace TradingBot.Services
             {
                 TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
                 BinanceCurrency currecny = request.Currency.ToBinanceCurrency();
-               
+                
+                if(request.Key != _botConfig.SecretKey)
+                {
+                    throw new Exception("Invalid secret key");
+                }
+
                 if (request.Action == "BUY" || request.Action == "SELL")
                 {
                     bool buy = request.Action == "BUY";
@@ -109,7 +105,7 @@ namespace TradingBot.Services
             catch(Exception ex)
             {
                 _logger.LogError(ex.Message);
-                _exucuting = true;
+                _exucuting = false;
             }
         }
     }

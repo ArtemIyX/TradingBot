@@ -29,9 +29,9 @@ class WebhookService
     {
         // Create an HTTP listener object and start it
         _httpListener = new HttpListener();
-        WebhookConfig? webhookConfig = _config.GetSection("Webhook").Get<WebhookConfig>();
-        _logger.LogInformation($"Listening for webhooks on {webhookConfig.Url}...");
-        _httpListener.Prefixes.Add(webhookConfig.Url);
+        BotConfig botConfig = _config.GetSection("Webhook").Get<BotConfig>();
+        _logger.LogInformation($"Listening for webhooks on {botConfig.WebhookUrl}...");
+        _httpListener.Prefixes.Add(botConfig.WebhookUrl);
         _httpListener.Start();
 
         while (_httpListener.IsListening)

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace TradingBot.Data
 {
     [Serializable]
-    internal class WebhookConfig
+    internal class BotConfig
     {
         public string Url { get; set; }
     }

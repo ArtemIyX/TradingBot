@@ -11,6 +11,7 @@ namespace TradingBot.Data
     {
         public string Action { get; set; }
         public string Currency { get; set; }
+        public string Key { get; set; }
     }
 
     [Serializable]
