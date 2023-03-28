@@ -7,18 +7,25 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using TradingBot.Data;
 
 namespace TradingBot.Services
 {
-    public struct StrategyAction
+    public class StrategyAction
     {
         public bool Buy { get; set; }
         public BinanceCurrency Currency { get; set; }
         public decimal Take { get; set; }
+       
+    }
+
+    public class StrategyAdvancedAction : StrategyAction
+    {
         public decimal Loss { get; set; }
+        public decimal PipSize { get; set; }
     }
 
     public struct StrategyStop
@@ -80,23 +87,34 @@ namespace TradingBot.Services
                 {
                     bool buy = request.Action == "BUY";
                     _exucuting = true;
-                    OnAction?.Invoke(this, new StrategyAction()
+                    // Pip tp/sl
+                    if (!_botConfig.DefaultTakeProfitEnabled)
                     {
-                        Buy = buy,
-                        Currency = currecny,
-                        Take = _binanceConfig.TakeProfit,
-                    });
+                        BinancePip? needPip = _botConfig.Pips.Find(x => x.Currency == request.Currency.ToString());
+                        // if we dont have pip
+                        if (needPip == null)
+                        {
+                            throw new Exception($"Pip profit enabled, but can not find {currecny} in settings");
+                        }
+                        OnAction?.Invoke(this, new StrategyAdvancedAction()
+                        {
+                            Buy = buy,
+                            Currency = currecny,
+                            Take = needPip.TP,
+                            Loss = needPip.SL,
+                            PipSize = needPip.PipSize
+                        });
+                    }
+                    else
+                    {
+                        OnAction?.Invoke(this, new StrategyAction()
+                        {
+                            Buy = buy,
+                            Currency = currecny,
+                            Take = _botConfig.DefaultTakeProfit,
+                        });
+                    }
                 }
-                /*else if(request.Action == "L_TPSL" || request.Action == "S_TPSL")
-                {
-                    bool buy = request.Action == "L_TPSL";
-                    _exucuting = true;
-                    OnStop.Invoke(this, new StrategyStop()
-                    {
-                        Buy = buy,
-                        Currency = currecny
-                    });
-                }*/
                 else
                 {
                     throw new Exception($"Unknown Request.Action ({request.Action})");

@@ -78,13 +78,23 @@ namespace TradingBot.Services
             }
 
 
-            TPSLResult calculatedTPSL = 
-                await _binanceService.CalculateTPSL(action.Currency, action.Buy, action.Take);
-            decimal entered = _binanceService.Enter;
-            TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
+            TPSLResult calculatedTPSL = new TPSLResult();
+            StrategyAdvancedAction? strategyAdvancedAction = action as StrategyAdvancedAction;
+            if (_botConfig.DefaultTakeProfitEnabled)
+            {
+                calculatedTPSL = await _binanceService.CalculateTPSL(action.Currency, action.Buy, action.Take);
+            }
+            else
+            {
+                calculatedTPSL = await _binanceService.CalculateTPSL_Advanced(strategyAdvancedAction.Currency, 
+                    strategyAdvancedAction.Buy, strategyAdvancedAction.Take, strategyAdvancedAction.Loss, strategyAdvancedAction.PipSize);
+            }
+           
 
             if (calculatedTPSL.Succes)
             {
+                decimal entered = _binanceService.Enter;
+                TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
                 if (action.Buy)
                 {
                     // Has BUY position with same currency
@@ -103,13 +113,26 @@ namespace TradingBot.Services
                         await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTPSL.Price);
 
                         //Open BUY Position
-                        await TradingView_OnAction(sender, new StrategyAction()
+                        if (_botConfig.DefaultTakeProfitEnabled)
                         {
-                            Buy = true,
-                            Currency = action.Currency,
-                            Take = action.Take,
-                            Loss = action.Loss
-                        });
+                            await TradingView_OnAction(sender, new StrategyAction()
+                            {
+                                Buy = true,
+                                Currency = action.Currency,
+                                Take = action.Take,
+                            });
+                        }
+                        else
+                        {
+                            await TradingView_OnAction(sender, new StrategyAdvancedAction()
+                            {
+                                Buy = true,
+                                Currency = strategyAdvancedAction.Currency,
+                                Take = strategyAdvancedAction.Take,
+                                Loss = strategyAdvancedAction.Loss,
+                                PipSize = strategyAdvancedAction.PipSize
+                            });
+                        }
                     }
                     // Doesnt have any position
                     else if (!_binanceService.HasPosition)
@@ -144,13 +167,26 @@ namespace TradingBot.Services
                         await _telegramBot.SendCancel(true, action.Currency, timeTaken, entered, calculatedTPSL.Price);
 
                         //Open SELL Position
-                        await TradingView_OnAction(sender, new StrategyAction()
+                        if (_botConfig.DefaultTakeProfitEnabled)
                         {
-                            Buy = false,
-                            Currency = action.Currency,
-                            Take = action.Take,
-                            Loss = action.Loss
-                        });
+                            await TradingView_OnAction(sender, new StrategyAction()
+                            {
+                                Buy = false,
+                                Currency = action.Currency,
+                                Take = action.Take,
+                            });
+                        }
+                        else
+                        {
+                            await TradingView_OnAction(sender, new StrategyAdvancedAction()
+                            {
+                                Buy = false,
+                                Currency = strategyAdvancedAction.Currency,
+                                Take = strategyAdvancedAction.Take,
+                                Loss = strategyAdvancedAction.Loss,
+                                PipSize = strategyAdvancedAction.PipSize
+                            });
+                        }
                     }
                     // Doesnt have any position
                     else if (!_binanceService.HasPosition)
@@ -217,6 +253,11 @@ namespace TradingBot.Services
         public async Task Start()
         {
             _logger.LogInformation("WELLSAIK ALERTS");
+            _logger.LogInformation("Pips: ");
+            foreach(var pip in _botConfig.Pips)
+            {
+                _logger.LogInformation($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.TP}\tSL: {pip.SL}]");
+            }
             _webhookService.WebhookReceived += WebhookReceived;
             _webhookService.StartListeningAsync();
             _telegramBot.Start();

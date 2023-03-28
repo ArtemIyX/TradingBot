@@ -524,6 +524,7 @@ internal class BinanceService
     private readonly IConfiguration _config;
     private readonly ILogger<WebhookService> _logger;
     private readonly BinanceConfig _binanceConfig;
+    private readonly BotConfig _botConfig;
     private BinanceClient _binanceClient;
 
     public BinanceCurrency CurrentCurrency { get; private set; }
@@ -544,6 +545,7 @@ internal class BinanceService
         _logger = Logger;
 
         _binanceConfig = _config.GetSection("Binance").Get<BinanceConfig>();
+        _botConfig = _config.GetSection("Bot").Get<BotConfig>();
 
         BinanceClientOptions clientOption = new BinanceClientOptions
         {
@@ -711,17 +713,49 @@ internal class BinanceService
         return res;
     }
 
-    public async Task<TPSLResult> CalculateTPSL(BinanceCurrency currency, bool buy, decimal TakePercent)
+    public async Task<TPSLResult> CalculateTPSL_Advanced(BinanceCurrency currency, bool buy, decimal take, decimal loss, decimal pipSize)
     {
-        // Determine where you've entered and in what direction
-        /* longStop = strategy.position_avg_price * (1 - stopPer)
-         shortStop = strategy.position_avg_price * (1 + stopPer)
-         shortTake = strategy.position_avg_price * (1 - takePer)
-         longTake = strategy.position_avg_price * (1 + takePer)*/
         try
         {
             decimal avgPprice = await GetAvgPrice(currency);
+            string label = buy ? "BUY" : "SELL";
+            _logger.LogInformation($"Calculating advanced TPSL for {label}. Price: {avgPprice}, TP pips: {take}, SL Pips: {loss}");
+            if (buy) 
+            {
+                return new TPSLResult()
+                {
+                    Succes = true,
+                    Price= avgPprice,
+                    Take = avgPprice + (take * pipSize),
+                    Loss = avgPprice - (loss * pipSize)
+                };
+            }
+            else
+            {
+                return new TPSLResult()
+                {
+                    Succes = true,
+                    Price = avgPprice,
+                    Take = avgPprice - (take * pipSize),
+                    Loss = avgPprice + (loss * pipSize)
+                };
+            }
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex.Message);
+            return new TPSLResult()
+            {
+                Succes = false
+            };
+        }
+    }
 
+    public async Task<TPSLResult> CalculateTPSL(BinanceCurrency currency, bool buy, decimal TakePercent)
+    {
+        try
+        {
+            decimal avgPprice = await GetAvgPrice(currency);
             var candles = await GetRecentCandles(currency, (KlineInterval)_binanceConfig.KlinePeriod, _binanceConfig.SwingLen);
 
             decimal sw_high = candles.Max(x => x.High);
@@ -946,6 +980,8 @@ internal class BinanceService
         }
         
     }
+
+
 }
 
 
