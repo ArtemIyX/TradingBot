@@ -17,7 +17,7 @@ namespace TradingBot.Services
         private readonly TelegramService _telegramBot;
         private readonly BinanceService _binanceService;
         private readonly TradingViewService _tradingViewService;
-        private readonly CancellationToken cancellationToken;
+        private readonly CancellationTokenSource _monitorSource;
 
 
         public Application(
@@ -28,6 +28,7 @@ namespace TradingBot.Services
             BinanceService binanceService,
             TradingViewService tradingViewService)
         {
+            _monitorSource = new CancellationTokenSource();
             _logger = logger;
             _config = config;
             _webhookService = webhookService;
@@ -77,6 +78,9 @@ namespace TradingBot.Services
 
             TPSLResult calculatedTPSL = 
                 await _binanceService.CalculateTPSL(action.Currency, action.Buy, action.Take);
+            decimal entered = _binanceService.Enter;
+            TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
+
             if (calculatedTPSL.Succes)
             {
                 if (action.Buy)
@@ -90,10 +94,10 @@ namespace TradingBot.Services
                     else if(_binanceService.HasPosition && (!_binanceService.Buy) && _binanceService.CurrentCurrency == action.Currency)
                     {
                         //TODO: Close BUY Position by market price
-                        decimal entered = _binanceService.Enter;
+
+                        _monitorSource.Cancel();
                         await _binanceService.ClosePosition();
                         _binanceService.NotifyFinished(action.Currency, false);
-                        TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
                         await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTPSL.Price);
                     }
                     // Doesnt have any position
@@ -101,7 +105,7 @@ namespace TradingBot.Services
                     {
                         await _binanceService.RequestBuy(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
 
-                        Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss);
+                        Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss, _monitorSource.Token);
 
                         await _telegramBot.SendLong(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
                     }
@@ -122,18 +126,17 @@ namespace TradingBot.Services
                     else if (_binanceService.HasPosition && _binanceService.Buy && _binanceService.CurrentCurrency == action.Currency)
                     {
                         //TODO: Close SELL Position by market price
-                        decimal entered = _binanceService.Enter;
+                        _monitorSource.Cancel();
                         await _binanceService.ClosePosition();
-                        _binanceService.NotifyFinished(action.Currency, false);
-                        TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
-                        await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTPSL.Price);
+                        _binanceService.NotifyFinished(action.Currency, true);
+                        await _telegramBot.SendCancel(true, action.Currency, timeTaken, entered, calculatedTPSL.Price);
                     }
                     // Doesnt have any position
                     else if (!_binanceService.HasPosition)
                     {
                         await _binanceService.RequestSell(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
 
-                        Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss);
+                        Task monitor = _binanceService.StartMonitorTPSL(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss, _monitorSource.Token);
 
                         await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
                     }

@@ -16,6 +16,7 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TradingBot.Data;
 
@@ -560,7 +561,7 @@ internal class BinanceService
         
        
     }
-    public async Task StartMonitorTPSL(BinanceCurrency currency, bool buy, decimal take, decimal stop)
+    public async Task StartMonitorTPSL(BinanceCurrency currency, bool buy, decimal take, decimal stop, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Started TPSL monitor...");
         MonitorResult result = new MonitorResult();
@@ -575,6 +576,10 @@ internal class BinanceService
         };
         while(true)
         {
+            if(cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
             decimal current = await GetAvgPrice(currency);
             i++;
             if (i == need)
