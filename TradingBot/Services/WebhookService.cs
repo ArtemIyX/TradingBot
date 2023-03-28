@@ -24,7 +24,7 @@ class WebhookService
     {
         _config = Config;
         _logger = Logger;
-        _botConfig = _config.GetSection("Webhook").Get<BotConfig>();
+        _botConfig = _config.GetSection("Bot").Get<BotConfig>();
     }
 
     public async Task StartListeningAsync()

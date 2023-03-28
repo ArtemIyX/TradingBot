@@ -14,6 +14,7 @@ using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
 using TradingBot.Data;
+using static System.Collections.Specialized.BitVector32;
 
 namespace TradingBot.Services;
 
@@ -65,17 +66,38 @@ internal class TelegramService
     {
         string position = buy ? "Long" : "Short";
         string tpString = tp ? "TP" : "SL";
-        string smile = percentageDifference < 0 ? _telegramConfig.Emoji[3] : "";
-        string profit = percentageDifference > 0 ? "Profit" : "Loss";
-        var split = currency.ToString().Split("USDT");
-        string emoji = buy ? _telegramConfig.Emoji[1] : _telegramConfig.Emoji[0];
+        string badSmile = percentageDifference < 0 ? _telegramConfig.Emoji[3] : "";
+        bool profit = percentageDifference > 0;
+        string profitStr = profit ? "Profit" : "Loss";
+        string firstEmoji = tp ? _telegramConfig.Emoji[9] : _telegramConfig.Emoji[10];
+        string secondEmoji = profit ? _telegramConfig.Emoji[8] : _telegramConfig.Emoji[6];
+        string[] split = currency.ToString().Split("USDT");
+        string directionEmoji = buy ? _telegramConfig.Emoji[1] : _telegramConfig.Emoji[0];
 
 
-        return $"{emoji} #{split[0]} /{split[1]} {position} {tpString}\n" +
+        return $"{firstEmoji}{firstEmoji}{firstEmoji}\n"+ 
+           $"{directionEmoji} #{split[0]} /{split[1]} {position} {tpString}\n" +
            $"{_telegramConfig.Emoji[4]} Enter: {Math.Round(enter, 3)}\n" +
-           $"{_telegramConfig.Emoji[6]} Exit: {Math.Round(exit, 3)}\n" +
-           $"{_telegramConfig.Emoji[2]} {profit}: {Math.Round(percentageDifference, 3)}% {smile}\n" +
+           $"{secondEmoji} Exit: {Math.Round(exit, 3)}\n" +
+           $"{_telegramConfig.Emoji[2]} {profitStr}: {Math.Round(percentageDifference, 3)}% {badSmile}\n" +
            $"{_telegramConfig.Emoji[7]} Time: {Math.Round(timeTaken.TotalMinutes, 1)}m";
+    }
+
+    private string MakeCancelText(bool wasBuy, BinanceCurrency currency, TimeSpan timeTaken, decimal enter, decimal exit, decimal percentageDifference)
+    {
+        string position = wasBuy ? "Long" : "Short";
+        string[] split = currency.ToString().Split("USDT");
+        string directionEmoji = wasBuy ? _telegramConfig.Emoji[1] : _telegramConfig.Emoji[0];
+        bool profit = percentageDifference > 0;
+        string secondEmoji = profit ? _telegramConfig.Emoji[8] : _telegramConfig.Emoji[6];
+        string profitStr = profit ? "Profit" : "Loss";
+        string badSmile = percentageDifference < 0 ? _telegramConfig.Emoji[3] : "";
+
+        return $"{directionEmoji} #{split[0]} /{split[1]} {position} Canceled {_telegramConfig.Emoji[10]}\n" +
+             $"{_telegramConfig.Emoji[4]} Enter: {Math.Round(enter, 3)}\n" +
+            $"{secondEmoji} Exit: {Math.Round(exit, 3)}\n" +
+              $"{_telegramConfig.Emoji[2]} {profitStr}: {Math.Round(percentageDifference, 3)}% {badSmile}\n" +
+              $"{_telegramConfig.Emoji[7]} Time: {Math.Round(timeTaken.TotalMinutes, 1)}m";
     }
 
     public async Task SendLong(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
@@ -95,8 +117,7 @@ internal class TelegramService
     public async Task SendTP(bool buy, BinanceCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
         _logger.LogInformation("Sending TP to telegram");
-        decimal priceDifference = buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
-        decimal percentageDifference = (priceDifference / enterPrice) * 100;
+        decimal percentageDifference = GetPercentageDiff(buy, enterPrice, exitPrice);
 
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
             MakeTPSLText(buy, true, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
@@ -105,11 +126,25 @@ internal class TelegramService
     public async Task SendSL(bool buy, BinanceCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
         _logger.LogInformation("Sending SL to telegram");
-        decimal priceDifference = buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
-        decimal percentageDifference = (priceDifference / enterPrice) * 100;
+        decimal percentageDifference = GetPercentageDiff(buy, enterPrice, exitPrice);
 
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
             MakeTPSLText(buy, false, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
+    }
+
+    public async Task SendCancel(bool wasBuy, BinanceCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
+    {
+        _logger.LogInformation("Sending Cancel to telegram");
+        decimal percentageDifference = GetPercentageDiff(wasBuy, enterPrice, exitPrice);
+        await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
+            MakeCancelText(wasBuy, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
+    }
+
+    private decimal GetPercentageDiff(bool buy, decimal enterPrice, decimal exitPrice)
+    {
+        decimal priceDifference = buy ? (exitPrice - enterPrice) : (enterPrice - exitPrice);
+        decimal percentageDifference = (priceDifference / enterPrice) * 100;
+        return percentageDifference;
     }
 
     private async Task SendMessageAsync(long chatId, string message)

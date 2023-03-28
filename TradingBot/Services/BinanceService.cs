@@ -927,6 +927,20 @@ internal class BinanceService
         HasPosition = true;
         OrderStarted = DateTime.Now;
     }
+
+    public async Task ClosePosition()
+    {
+        _logger.LogInformation("Closing order at market price");
+        if (_binanceConfig.Status)
+        {
+            await _binanceClient.UsdFuturesApi.Trading.CancelAllOrdersAsync(CurrentCurrency.ToString());
+        }
+        else
+        {
+            _logger.LogWarning($"Do not interact with finances, as the status is OFF");
+        }
+        
+    }
 }
 
 

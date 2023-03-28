@@ -90,6 +90,11 @@ namespace TradingBot.Services
                     else if(_binanceService.HasPosition && (!_binanceService.Buy) && _binanceService.CurrentCurrency == action.Currency)
                     {
                         //TODO: Close BUY Position by market price
+                        decimal entered = _binanceService.Enter;
+                        await _binanceService.ClosePosition();
+                        _binanceService.NotifyFinished(action.Currency, false);
+                        TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
+                        await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTPSL.Price);
                     }
                     // Doesnt have any position
                     else if (!_binanceService.HasPosition)
@@ -117,6 +122,11 @@ namespace TradingBot.Services
                     else if (_binanceService.HasPosition && _binanceService.Buy && _binanceService.CurrentCurrency == action.Currency)
                     {
                         //TODO: Close SELL Position by market price
+                        decimal entered = _binanceService.Enter;
+                        await _binanceService.ClosePosition();
+                        _binanceService.NotifyFinished(action.Currency, false);
+                        TimeSpan timeTaken = DateTime.Now - _binanceService.OrderStarted;
+                        await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTPSL.Price);
                     }
                     // Doesnt have any position
                     else if (!_binanceService.HasPosition)
