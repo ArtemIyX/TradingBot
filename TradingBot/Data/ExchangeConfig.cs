@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TradingBot.Data
 {
-    internal struct BinanceConfig
+    internal struct ExchangeServiceConfig
     {
         public bool Status { get; set; }
         public int SwingLen { get; set; }

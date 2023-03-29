@@ -50,7 +50,7 @@ internal class TelegramService
         //_logger.LogError("Telegram: " + ex.Message);
     }
 
-    private string MakeOpenText(bool buy, BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
+    private string MakeOpenText(bool buy, CryptoCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
     {
         string position = buy ? "Long" : "Short";
         string[] split = currency.ToString().Split("USDT");
@@ -62,7 +62,7 @@ internal class TelegramService
             $"{_telegramConfig.Emoji[6]} SL: {Math.Round(stopLoss, 3)}";
     }
 
-    private string MakeTPSLText(bool buy, bool tp, BinanceCurrency currency, TimeSpan timeTaken, decimal enter, decimal exit, decimal percentageDifference)
+    private string MakeTPSLText(bool buy, bool tp, CryptoCurrency currency, TimeSpan timeTaken, decimal enter, decimal exit, decimal percentageDifference)
     {
         string position = buy ? "Long" : "Short";
         string tpString = tp ? "TP" : "SL";
@@ -83,7 +83,7 @@ internal class TelegramService
            $"{_telegramConfig.Emoji[7]} Time: {Math.Round(timeTaken.TotalMinutes, 1)}m";
     }
 
-    private string MakeCancelText(bool wasBuy, BinanceCurrency currency, TimeSpan timeTaken, decimal enter, decimal exit, decimal percentageDifference)
+    private string MakeCancelText(bool wasBuy, CryptoCurrency currency, TimeSpan timeTaken, decimal enter, decimal exit, decimal percentageDifference)
     {
         string position = wasBuy ? "Long" : "Short";
         string[] split = currency.ToString().Split("USDT");
@@ -100,21 +100,21 @@ internal class TelegramService
               $"{_telegramConfig.Emoji[7]} Time: {Math.Round(timeTaken.TotalMinutes, 1)}m";
     }
 
-    public async Task SendLong(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
+    public async Task SendLong(CryptoCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
     {
         _logger.LogInformation("Sending Long to telegram");
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
              MakeOpenText(true, currency, price, takeProfit, stopLoss));
     }
 
-    public async Task SendShort(BinanceCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
+    public async Task SendShort(CryptoCurrency currency, decimal price, decimal takeProfit, decimal stopLoss)
     {
         _logger.LogInformation("Sending Short to telegram");
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
              MakeOpenText(false, currency, price, takeProfit, stopLoss));
     }
 
-    public async Task SendTP(bool buy, BinanceCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
+    public async Task SendTP(bool buy, CryptoCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
         _logger.LogInformation("Sending TP to telegram");
         decimal percentageDifference = GetPercentageDiff(buy, enterPrice, exitPrice);
@@ -123,7 +123,7 @@ internal class TelegramService
             MakeTPSLText(buy, true, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
     }
 
-    public async Task SendSL(bool buy, BinanceCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
+    public async Task SendSL(bool buy, CryptoCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
         _logger.LogInformation("Sending SL to telegram");
         decimal percentageDifference = GetPercentageDiff(buy, enterPrice, exitPrice);
@@ -132,7 +132,7 @@ internal class TelegramService
             MakeTPSLText(buy, false, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
     }
 
-    public async Task SendCancel(bool wasBuy, BinanceCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
+    public async Task SendCancel(bool wasBuy, CryptoCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
         _logger.LogInformation("Sending Cancel to telegram");
         decimal percentageDifference = GetPercentageDiff(wasBuy, enterPrice, exitPrice);

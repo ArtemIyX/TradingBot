@@ -11,6 +11,7 @@ namespace TradingBot.Data
     {
         public string WebhookUrl { get; set; }
         public string SecretKey { get; set; }
+        public bool UseBinance { get; set; }
         public bool Cancel { get; set; }
         public bool DefaultTakeProfitEnabled { get; set; }
         public decimal DefaultTakeProfit { get; set; }

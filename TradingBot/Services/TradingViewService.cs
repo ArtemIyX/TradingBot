@@ -17,7 +17,7 @@ namespace TradingBot.Services
     public class StrategyAction
     {
         public bool Buy { get; set; }
-        public BinanceCurrency Currency { get; set; }
+        public CryptoCurrency Currency { get; set; }
         public decimal Take { get; set; }
        
     }
@@ -31,7 +31,7 @@ namespace TradingBot.Services
     public struct StrategyStop
     {
         public bool Buy { get; set; }
-        public BinanceCurrency Currency { get; set; }
+        public CryptoCurrency Currency { get; set; }
     }
 
     public delegate Task StrategyActionDelegate(object? sender, StrategyAction action);
@@ -41,7 +41,7 @@ namespace TradingBot.Services
     {
         private readonly IConfiguration _config;
         private readonly ILogger<WebhookService> _logger;
-        private readonly BinanceConfig _binanceConfig;
+        private readonly ExchangeServiceConfig _exchangeServiceConfig;
         private readonly BotConfig _botConfig;
 
 
@@ -55,7 +55,7 @@ namespace TradingBot.Services
         {
             _config = Config;
             _logger = Logger;
-            _binanceConfig = _config.GetSection("Binance").Get<BinanceConfig>();
+            _exchangeServiceConfig = _config.GetSection("ExchangeService").Get<ExchangeServiceConfig>();
             _botConfig = _config.GetSection("Bot").Get<BotConfig>();
         }
 
@@ -76,7 +76,7 @@ namespace TradingBot.Services
             try
             {
                 TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
-                BinanceCurrency currecny = request.Currency.ToBinanceCurrency();
+                CryptoCurrency currecny = request.Currency.ToBinanceCurrency();
                 
                 if(request.Key != _botConfig.SecretKey)
                 {
