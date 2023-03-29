@@ -25,11 +25,11 @@ internal class TelegramService
     private TelegramBotClient _bot;
     private TelegramConfig _telegramConfig;
 
-    public TelegramService(IConfiguration Config,
-                          ILogger<WebhookService> Logger)
+    public TelegramService(IConfiguration config,
+                          ILogger<WebhookService> logger)
     {
-        _config = Config;
-        _logger = Logger;
+        _config = config;
+        _logger = logger;
         _telegramConfig = _config.GetSection("Telegram").Get<TelegramConfig>();
     }
     public async Task Start()
@@ -62,7 +62,7 @@ internal class TelegramService
             $"{_telegramConfig.Emoji[6]} SL: {Math.Round(stopLoss, 3)}";
     }
 
-    private string MakeTPSLText(bool buy, bool tp, CryptoCurrency currency, TimeSpan timeTaken, decimal enter, decimal exit, decimal percentageDifference)
+    private string MakeTpSlText(bool buy, bool tp, CryptoCurrency currency, TimeSpan timeTaken, decimal enter, decimal exit, decimal percentageDifference)
     {
         string position = buy ? "Long" : "Short";
         string tpString = tp ? "TP" : "SL";
@@ -114,22 +114,22 @@ internal class TelegramService
              MakeOpenText(false, currency, price, takeProfit, stopLoss));
     }
 
-    public async Task SendTP(bool buy, CryptoCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
+    public async Task SendTakeProfit(bool buy, CryptoCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
         _logger.LogInformation("Sending TP to telegram");
         decimal percentageDifference = GetPercentageDiff(buy, enterPrice, exitPrice);
 
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
-            MakeTPSLText(buy, true, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
+            MakeTpSlText(buy, true, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
     }
 
-    public async Task SendSL(bool buy, CryptoCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
+    public async Task SendStopLoss(bool buy, CryptoCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)
     {
         _logger.LogInformation("Sending SL to telegram");
         decimal percentageDifference = GetPercentageDiff(buy, enterPrice, exitPrice);
 
         await _bot.SendTextMessageAsync(new ChatId(_telegramConfig.ChatId),
-            MakeTPSLText(buy, false, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
+            MakeTpSlText(buy, false, currency, timeTaken, enterPrice, exitPrice, percentageDifference));
     }
 
     public async Task SendCancel(bool wasBuy, CryptoCurrency currency, TimeSpan timeTaken, decimal enterPrice, decimal exitPrice)

@@ -19,21 +19,20 @@ class WebhookService
     private readonly BotConfig _botConfig;
     private HttpListener _httpListener;
 
-    public WebhookService(IConfiguration Config,
-                          ILogger<WebhookService> Logger)
+    public WebhookService(IConfiguration config,
+                          ILogger<WebhookService> logger)
     {
-        _config = Config;
-        _logger = Logger;
-        _botConfig = _config.GetSection("Bot").Get<BotConfig>();
+        _config = config;
+        _logger = logger;
+        _botConfig = _config.GetSection("Bot").Get<BotConfig>() ?? throw new InvalidOperationException();
+        _httpListener = new HttpListener();
     }
 
     public async Task StartListeningAsync()
     {
         // Create an HTTP listener object and start it
-        _httpListener = new HttpListener();
-        
         _logger.LogInformation($"Listening for webhooks on {_botConfig.WebhookUrl}...");
-        _httpListener.Prefixes.Add(_botConfig.WebhookUrl);
+        _httpListener.Prefixes.Add(_botConfig.WebhookUrl ?? throw new InvalidOperationException());
         _httpListener.Start();
 
         while (_httpListener.IsListening)
@@ -56,9 +55,9 @@ class WebhookService
                 context.Response.StatusDescription = "OK";
                 context.Response.Close();
             }
-            catch(Exception)
+            catch (Exception)
             {
-                
+                // ignored
             }
         }
     }

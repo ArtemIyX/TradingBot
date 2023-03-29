@@ -32,13 +32,13 @@ namespace TradingBot.Services
             _webhookService = webhookService;
             _telegramBot = telegramBot;
             _brokerService = brokerService;
-            _brokerService.TPSLReached += BrokerServiceTpslReached;
+            _brokerService.TpSlReached += BrokerServiceTpSlReached;
             _tradingViewService = tradingViewService;
             _tradingViewService.OnAction += TradingView_OnAction;
             _tradingViewService.OnStop += TradingView_OnStop;
         }
 
-        private async Task BrokerServiceTpslReached(MonitorResult result)
+        private async Task BrokerServiceTpSlReached(MonitorResult result)
         {
             string takeProfitStr = result.Take ? "TP" : "SL";
             string longStr = result.Buy ? "Long" : "Short";
@@ -52,11 +52,11 @@ namespace TradingBot.Services
             _brokerService.NotifyFinished(result.Currency, result.Buy);
             if (result.Take)
             {
-                await _telegramBot.SendTP(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
+                await _telegramBot.SendTakeProfit(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
             else
             {
-                await _telegramBot.SendSL(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
+                await _telegramBot.SendStopLoss(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
         }
 
@@ -73,11 +73,11 @@ namespace TradingBot.Services
             }
 
 
-            TPSLResult calculatedTakeProfit;
+            TakeProfitStopLossResult calculatedTakeProfit;
             StrategyAdvancedAction? strategyAdvancedAction = action as StrategyAdvancedAction;
             if (_botConfig.DefaultTakeProfitEnabled)
             {
-                calculatedTakeProfit = await _brokerService.CalculateTPSL(action.Currency, action.Buy, action.Take);
+                calculatedTakeProfit = await _brokerService.CalculateTpSl(action.Currency, action.Buy, action.Take);
             }
             else
             {
@@ -88,7 +88,7 @@ namespace TradingBot.Services
             }
            
 
-            if (calculatedTakeProfit.Succes)
+            if (calculatedTakeProfit.Success)
             {
                 decimal entered = _brokerService.Enter;
                 TimeSpan timeTaken = DateTime.Now - _brokerService.OrderStarted;
@@ -227,7 +227,7 @@ namespace TradingBot.Services
             _logger.LogInformation("Pips: ");
             foreach(var pip in _botConfig.Pips)
             {
-                _logger.LogInformation($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.TP}\tSL: {pip.SL}]");
+                _logger.LogInformation($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.Tp}\tSL: {pip.Sl}]");
             }
             _webhookService.WebhookReceived += WebhookReceived;
             // ReSharper disable once UnusedVariable

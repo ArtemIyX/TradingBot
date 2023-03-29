@@ -50,13 +50,13 @@ namespace TradingBot.Services
 
         private bool _exucuting = false;
 
-        public TradingViewService(IConfiguration Config,
-                         ILogger<WebhookService> Logger)
+        public TradingViewService(IConfiguration config,
+                         ILogger<WebhookService> logger)
         {
-            _config = Config;
-            _logger = Logger;
+            _config = config;
+            _logger = logger;
             _exchangeServiceConfig = _config.GetSection("ExchangeService").Get<ExchangeServiceConfig>();
-            _botConfig = _config.GetSection("Bot").Get<BotConfig>();
+            _botConfig = _config.GetSection("Bot").Get<BotConfig>() ?? throw new InvalidOperationException();
         }
 
 
@@ -76,7 +76,7 @@ namespace TradingBot.Services
             try
             {
                 TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
-                CryptoCurrency currecny = request.Currency.ToBinanceCurrency();
+                CryptoCurrency currency = request.Currency.ToBinanceCurrency();
                 
                 if(request.Key != _botConfig.SecretKey)
                 {
@@ -94,14 +94,14 @@ namespace TradingBot.Services
                         // if we dont have pip
                         if (needPip == null)
                         {
-                            throw new Exception($"Pip profit enabled, but can not find {currecny} in settings");
+                            throw new Exception($"Pip profit enabled, but can not find {currency} in settings");
                         }
                         OnAction?.Invoke(this, new StrategyAdvancedAction()
                         {
                             Buy = buy,
-                            Currency = currecny,
-                            Take = needPip.TP,
-                            Loss = needPip.SL,
+                            Currency = currency,
+                            Take = needPip.Tp,
+                            Loss = needPip.Sl,
                             PipSize = needPip.PipSize
                         });
                     }
@@ -110,7 +110,7 @@ namespace TradingBot.Services
                         OnAction?.Invoke(this, new StrategyAction()
                         {
                             Buy = buy,
-                            Currency = currecny,
+                            Currency = currency,
                             Take = _botConfig.DefaultTakeProfit,
                         });
                     }

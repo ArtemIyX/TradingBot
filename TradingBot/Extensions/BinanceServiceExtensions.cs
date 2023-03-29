@@ -1,58 +1,39 @@
-﻿namespace TradingBot.Services;
+﻿using TradingBot.Data;
+
+namespace TradingBot.Services;
 
 public static class BinanceServiceExtensions
 {
-    public static CryptoCurrency ToBinanceCurrency(this string input)
+    public static CryptoCurrency ToBinanceCurrency(this string? input)
     {
-        CryptoCurrency currency;
-        if (Enum.TryParse(input, out currency))
+        if (Enum.TryParse(input, out CryptoCurrency currency))
         {
             return currency;
         }
-        else
-        {
-            return CryptoCurrency.None;
-        }
+
+        return CryptoCurrency.None;
     }
 
-    public static string ConvertKlineIntervalToString(Binance.Net.Enums.KlineInterval interval)
-    {
-        switch (interval)
+    public static string ConvertKlineIntervalToString(Binance.Net.Enums.KlineInterval interval) =>
+        interval switch
         {
-            case Binance.Net.Enums.KlineInterval.OneSecond:
-                return "1s";
-            case Binance.Net.Enums.KlineInterval.OneMinute:
-                return "1m";
-            case Binance.Net.Enums.KlineInterval.ThreeMinutes:
-                return "3m";
-            case Binance.Net.Enums.KlineInterval.FiveMinutes:
-                return "5m";
-            case Binance.Net.Enums.KlineInterval.FifteenMinutes:
-                return "15m";
-            case Binance.Net.Enums.KlineInterval.ThirtyMinutes:
-                return "30m";
-            case Binance.Net.Enums.KlineInterval.OneHour:
-                return "1h";
-            case Binance.Net.Enums.KlineInterval.TwoHour:
-                return "2h";
-            case Binance.Net.Enums.KlineInterval.FourHour:
-                return "4h";
-            case Binance.Net.Enums.KlineInterval.SixHour:
-                return "6h";
-            case Binance.Net.Enums.KlineInterval.EightHour:
-                return "8h";
-            case Binance.Net.Enums.KlineInterval.TwelveHour:
-                return "12h";
-            case Binance.Net.Enums.KlineInterval.OneDay:
-                return "1d";
-            case Binance.Net.Enums.KlineInterval.ThreeDay:
-                return "3d";
-            case Binance.Net.Enums.KlineInterval.OneWeek:
-                return "1w";
-            case Binance.Net.Enums.KlineInterval.OneMonth:
-                return "1M";
-            default:
-                throw new ArgumentOutOfRangeException(nameof(interval), interval, null);
-        }
-    }
+            Binance.Net.Enums.KlineInterval.OneSecond => "1s",
+            Binance.Net.Enums.KlineInterval.OneMinute => "1m",
+            Binance.Net.Enums.KlineInterval.ThreeMinutes => "3m",
+            Binance.Net.Enums.KlineInterval.FiveMinutes => "5m",
+            Binance.Net.Enums.KlineInterval.FifteenMinutes => "15m",
+            Binance.Net.Enums.KlineInterval.ThirtyMinutes => "30m",
+            Binance.Net.Enums.KlineInterval.OneHour => "1h",
+            Binance.Net.Enums.KlineInterval.TwoHour => "2h",
+            Binance.Net.Enums.KlineInterval.FourHour => "4h",
+            Binance.Net.Enums.KlineInterval.SixHour => "6h",
+            Binance.Net.Enums.KlineInterval.EightHour => "8h",
+            Binance.Net.Enums.KlineInterval.TwelveHour => "12h",
+            Binance.Net.Enums.KlineInterval.OneDay => "1d",
+            Binance.Net.Enums.KlineInterval.ThreeDay => "3d",
+            Binance.Net.Enums.KlineInterval.OneWeek => "1w",
+            Binance.Net.Enums.KlineInterval.OneMonth => "1M",
+            _ => throw new ArgumentOutOfRangeException(nameof(interval), interval, null)
+        };
+    
 }

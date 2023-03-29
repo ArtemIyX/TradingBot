@@ -1,4 +1,6 @@
-﻿namespace TradingBot.Services;
+﻿// ReSharper disable UnusedMember.Global
+// ReSharper disable IdentifierTypo
+namespace TradingBot.Data;
 
 public enum CryptoCurrency
 {

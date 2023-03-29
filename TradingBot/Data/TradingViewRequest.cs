@@ -7,11 +7,22 @@ using System.Threading.Tasks;
 namespace TradingBot.Data
 {
     [Serializable]
-    internal class TradingViewRequest
+    public class TradingViewRequest
     {
-        public string Action { get; set; }
-        public string Currency { get; set; }
-        public string Key { get; set; }
+        public TradingViewRequest()
+        {
+            
+        }
+        public TradingViewRequest(string? action, string? currency, string? key)
+        {
+            Action = action;
+            Currency = currency;
+            Key = key;
+        }
+
+        public string? Action { get; set; }
+        public string? Currency { get; set; }
+        public string? Key { get; set; }
     }
 
     [Serializable]

@@ -14,63 +14,36 @@ using TradingBot.Data;
 
 namespace TradingBot.Services;
 
-public struct MonitorResult
-{
-    public CryptoCurrency Currency { get; set; }
-    public bool Take { get; set; }
-    public bool Buy { get; set; }
-    public decimal Price { get; set; }
-}
-
-public struct TPSLResult
-{
-    public decimal Price { get; set; }
-    public decimal Take { get; set; }
-    public decimal Loss { get; set; }
-    public bool Succes { get; set; }
-}
-
-public struct BinanceCandlestickData
-{
-    public long OpenTime { get; set; }
-    public decimal Open { get; set; }
-    public decimal High { get; set; }
-    public decimal Low { get; set; }
-    public decimal Close { get; set; }
-    public decimal Volume { get; set; }
-    public long CloseTime { get; set; }
-}
-
-public delegate Task CurrencyTPSLDelegate(MonitorResult Result);
-
 internal class BrokerService
 {
+    // ReSharper disable once PrivateFieldCanBeConvertedToLocalVariable
     private readonly IConfiguration _config;
     private readonly ILogger<WebhookService> _logger;
     private readonly ExchangeServiceConfig _exchangeServiceConfig;
     private readonly BotConfig _botConfig;
-    private BinanceClient _binanceClient;
-    private BybitClient _bybitClient;
+    private readonly BinanceClient _binanceClient;
+    private readonly BybitClient _bybitClient;
 
     public CryptoCurrency CurrentCurrency { get; private set; }
     public bool HasPosition { get; private set; }
     public bool Buy { get; private set; }
     public decimal Enter { get; private set; }
     public string OrderId { get; private set; }
-    public DateTime OrderStarted { get; set; }
+    public DateTime OrderStarted { get; private set; }
 
-    public event CurrencyTPSLDelegate TPSLReached;
+    public event CurrencyTpSlDelegate? TpSlReached;
 
-    public BrokerService(IConfiguration Config,
-        ILogger<WebhookService> Logger)
+    public BrokerService(IConfiguration config,
+        ILogger<WebhookService> logger)
     {
+        OrderId = "";
         CurrentCurrency = CryptoCurrency.None;
         HasPosition = false;
-        _config = Config;
-        _logger = Logger;
+        _config = config;
+        _logger = logger;
 
         _exchangeServiceConfig = _config.GetSection("ExchangeService").Get<ExchangeServiceConfig>();
-        _botConfig = _config.GetSection("Bot").Get<BotConfig>();
+        _botConfig = _config.GetSection("Bot").Get<BotConfig>() ?? throw new InvalidOperationException("Can not get 'Bot' from settings");
 
         BinanceClientOptions binanceClientOption = new BinanceClientOptions
         {
@@ -99,16 +72,20 @@ internal class BrokerService
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Started TPSL monitor...");
-        MonitorResult result = new MonitorResult();
-        result.Buy = buy;
-        result.Currency = currency;
+        MonitorResult result = new MonitorResult
+        {
+            Buy = buy,
+            Currency = currency
+        };
         int i = 1;
         int need = 3;
-        Action<decimal> print = (decimal currenctPrice) =>
+
+        void Print(decimal currentPrice)
         {
             Console.Clear();
-            _logger.LogInformation($"Monitoring {currency}: {currenctPrice} (TP: {take}, SP: {stop})");
-        };
+            _logger.LogInformation($"Monitoring {currency}: {currentPrice} (TP: {take}, SP: {stop})");
+        }
+
         while (true)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -120,7 +97,7 @@ internal class BrokerService
             i++;
             if (i == need)
             {
-                print(current);
+                Print(current);
                 i = 1;
             }
 
@@ -130,16 +107,16 @@ internal class BrokerService
                 {
                     result.Take = true;
                     result.Price = current;
-                    print(current);
-                    TPSLReached?.Invoke(result);
+                    Print(current);
+                    TpSlReached?.Invoke(result);
                     return;
                 }
                 else if (current <= stop)
                 {
                     result.Take = false;
                     result.Price = current;
-                    print(current);
-                    TPSLReached?.Invoke(result);
+                    Print(current);
+                    TpSlReached?.Invoke(result);
                     return;
                 }
             }
@@ -149,21 +126,21 @@ internal class BrokerService
                 {
                     result.Take = true;
                     result.Price = current;
-                    print(current);
-                    TPSLReached?.Invoke(result);
+                    Print(current);
+                    TpSlReached?.Invoke(result);
                     return;
                 }
                 else if (current >= stop)
                 {
                     result.Take = false;
                     result.Price = current;
-                    print(current);
-                    TPSLReached?.Invoke(result);
+                    Print(current);
+                    TpSlReached?.Invoke(result);
                     return;
                 }
             }
 
-            await Task.Delay(1000);
+            await Task.Delay(1000, cancellationToken);
         }
     }
 
@@ -178,7 +155,7 @@ internal class BrokerService
 
             // If the API call was unsuccessful, throw an exception with the error message.
             if (!res.Success)
-                throw new Exception(res.Error.Message);
+                throw new Exception(res.Error?.Message);
 
             // Loop through each balance to find the USDT balance and return it.
             foreach (var data in res.Data)
@@ -247,7 +224,7 @@ internal class BrokerService
             JArray resultArray = jresult["result"] as JArray ??
                                  throw new Exception("Can not find 'result' array in json content from price request");
             JObject result = (JObject)resultArray[0];
-            string lastPrice = result["last_price"].Value<string>();
+            string lastPrice = (result["last_price"] ?? throw new InvalidOperationException()).Value<string>() ?? throw new InvalidOperationException();
             CultureInfo culture = CultureInfo.InvariantCulture;
             decimal price = decimal.Parse(lastPrice, NumberStyles.Number, culture);
             return price;
@@ -264,39 +241,37 @@ internal class BrokerService
 
         string apiUrl = $"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={inter}&limit={limit}";
         List<BinanceCandlestickData> res = new List<BinanceCandlestickData>();
-        using (var httpClient = new HttpClient())
-        {
-            var response = await httpClient.GetAsync(apiUrl);
+        using var httpClient = new HttpClient();
+        var response = await httpClient.GetAsync(apiUrl);
 
-            if (response.IsSuccessStatusCode)
+        if (response.IsSuccessStatusCode)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            var data = JsonConvert.DeserializeObject<object[][]>(json);
+            CultureInfo culture = CultureInfo.InvariantCulture;
+            foreach (var candle in data)
             {
-                var json = await response.Content.ReadAsStringAsync();
-                var data = JsonConvert.DeserializeObject<object[][]>(json);
-                CultureInfo culture = CultureInfo.InvariantCulture;
-                foreach (var candle in data)
+                res.Add(new BinanceCandlestickData
                 {
-                    res.Add(new BinanceCandlestickData
-                    {
-                        OpenTime = (long)candle[0],
-                        Open = decimal.Parse((string)candle[1], NumberStyles.Number, culture),
-                        High = decimal.Parse((string)candle[2], NumberStyles.Number, culture),
-                        Low = decimal.Parse((string)candle[3], NumberStyles.Number, culture),
-                        Close = decimal.Parse((string)candle[4], NumberStyles.Number, culture),
-                        Volume = decimal.Parse((string)candle[5], NumberStyles.Number, culture),
-                        CloseTime = (long)candle[6]
-                    });
-                }
+                    OpenTime = (long)candle[0],
+                    Open = decimal.Parse((string)candle[1], NumberStyles.Number, culture),
+                    High = decimal.Parse((string)candle[2], NumberStyles.Number, culture),
+                    Low = decimal.Parse((string)candle[3], NumberStyles.Number, culture),
+                    Close = decimal.Parse((string)candle[4], NumberStyles.Number, culture),
+                    Volume = decimal.Parse((string)candle[5], NumberStyles.Number, culture),
+                    CloseTime = (long)candle[6]
+                });
             }
-            else
-            {
-                Console.WriteLine($"Error: {response.StatusCode}");
-            }
+        }
+        else
+        {
+            Console.WriteLine($"Error: {response.StatusCode}");
         }
 
         return res;
     }
 
-    public async Task<TPSLResult> CalculateTPSL_Advanced(CryptoCurrency currency, bool buy, decimal take, decimal loss,
+    public async Task<TakeProfitStopLossResult> CalculateTPSL_Advanced(CryptoCurrency currency, bool buy, decimal take, decimal loss,
         decimal pipSize)
     {
         try
@@ -307,9 +282,9 @@ internal class BrokerService
                 $"Calculating advanced TPSL for {label}. Price: {avgPprice}, TP pips: {take}, SL Pips: {loss}");
             if (buy)
             {
-                return new TPSLResult()
+                return new TakeProfitStopLossResult()
                 {
-                    Succes = true,
+                    Success = true,
                     Price = avgPprice,
                     Take = avgPprice + (take * pipSize),
                     Loss = avgPprice - (loss * pipSize)
@@ -317,9 +292,9 @@ internal class BrokerService
             }
             else
             {
-                return new TPSLResult()
+                return new TakeProfitStopLossResult()
                 {
-                    Succes = true,
+                    Success = true,
                     Price = avgPprice,
                     Take = avgPprice - (take * pipSize),
                     Loss = avgPprice + (loss * pipSize)
@@ -329,14 +304,14 @@ internal class BrokerService
         catch (Exception ex)
         {
             _logger.LogError(ex.Message);
-            return new TPSLResult()
+            return new TakeProfitStopLossResult()
             {
-                Succes = false
+                Success = false
             };
         }
     }
 
-    public async Task<TPSLResult> CalculateTPSL(CryptoCurrency currency, bool buy, decimal TakePercent)
+    public async Task<TakeProfitStopLossResult> CalculateTpSl(CryptoCurrency currency, bool buy, decimal takePercent)
     {
         try
         {
@@ -347,8 +322,8 @@ internal class BrokerService
             decimal sw_high = candles.Max(x => x.High);
             decimal sw_low = candles.Min(x => x.Low);
 
-            decimal buyTakeProfit = avgPprice + Math.Abs(avgPprice - sw_low) * TakePercent;
-            decimal sellTakeProfit = avgPprice - Math.Abs(sw_high - avgPprice) * TakePercent;
+            decimal buyTakeProfit = avgPprice + Math.Abs(avgPprice - sw_low) * takePercent;
+            decimal sellTakeProfit = avgPprice - Math.Abs(sw_high - avgPprice) * takePercent;
 
             decimal actualProfit = buy ? buyTakeProfit : sellTakeProfit;
             decimal actualLoss = buy ? sw_low : sw_high;
@@ -374,20 +349,20 @@ internal class BrokerService
                 }
             }
 
-            return new TPSLResult()
+            return new TakeProfitStopLossResult()
             {
                 Price = avgPprice,
                 Take = actualProfit,
                 Loss = actualLoss,
-                Succes = true
+                Success = true
             };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex.Message);
-            return new TPSLResult()
+            return new TakeProfitStopLossResult()
             {
-                Succes = false
+                Success = false
             };
         }
     }
@@ -510,7 +485,7 @@ internal class BrokerService
 
         // Throw exception if order placement was unsuccessful
         if (!openPositionResult.Success)
-            throw new Exception(openPositionResult.Error.Message);
+            throw new Exception(openPositionResult.Error?.Message);
 
         _logger.LogWarning($"Set SL on binance..");
         // Place stop loss order using Binance API
@@ -525,7 +500,7 @@ internal class BrokerService
         if (!stopLossResult.Success)
         {
             await TryCloseBinanceOrder(currency, long.Parse(OrderId));
-            throw new Exception(stopLossResult.Error.Message);
+            throw new Exception(stopLossResult.Error?.Message);
         }
 
         _logger.LogWarning($"Set TP on binance..");
@@ -542,7 +517,7 @@ internal class BrokerService
         if (!takeProfitResult.Success)
         {
             await TryCloseBinanceOrder(currency, long.Parse(OrderId));
-            throw new Exception(takeProfitResult.Error.Message);
+            throw new Exception(takeProfitResult.Error?.Message);
         }
     }
 
