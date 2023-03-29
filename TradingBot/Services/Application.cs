@@ -1,18 +1,13 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TradingBot.Data;
-using static System.Collections.Specialized.BitVector32;
 
 namespace TradingBot.Services
 {
     internal class Application
     {
         private readonly ILogger<Application> _logger;
+        // ReSharper disable once PrivateFieldCanBeConvertedToLocalVariable
         private readonly IConfiguration _config;
         private readonly WebhookService _webhookService;
         private readonly TelegramService _telegramBot;
@@ -33,7 +28,7 @@ namespace TradingBot.Services
             _monitorSource = new CancellationTokenSource();
             _logger = logger;
             _config = config;
-            _botConfig = _config.GetSection("Bot").Get<BotConfig>();
+            _botConfig = _config.GetSection("Bot").Get<BotConfig>() ?? throw new InvalidOperationException("Can not get 'Bot' settings");
             _webhookService = webhookService;
             _telegramBot = telegramBot;
             _brokerService = brokerService;
@@ -78,20 +73,22 @@ namespace TradingBot.Services
             }
 
 
-            TPSLResult calculatedTPSL = new TPSLResult();
+            TPSLResult calculatedTakeProfit;
             StrategyAdvancedAction? strategyAdvancedAction = action as StrategyAdvancedAction;
             if (_botConfig.DefaultTakeProfitEnabled)
             {
-                calculatedTPSL = await _brokerService.CalculateTPSL(action.Currency, action.Buy, action.Take);
+                calculatedTakeProfit = await _brokerService.CalculateTPSL(action.Currency, action.Buy, action.Take);
             }
             else
             {
-                calculatedTPSL = await _brokerService.CalculateTPSL_Advanced(strategyAdvancedAction.Currency, 
+                if (strategyAdvancedAction == null)
+                    throw new Exception("Request pip take profit, but strategy advanced action is null");
+                calculatedTakeProfit = await _brokerService.CalculateTPSL_Advanced(strategyAdvancedAction.Currency, 
                     strategyAdvancedAction.Buy, strategyAdvancedAction.Take, strategyAdvancedAction.Loss, strategyAdvancedAction.PipSize);
             }
            
 
-            if (calculatedTPSL.Succes)
+            if (calculatedTakeProfit.Succes)
             {
                 decimal entered = _brokerService.Enter;
                 TimeSpan timeTaken = DateTime.Now - _brokerService.OrderStarted;
@@ -110,7 +107,7 @@ namespace TradingBot.Services
                         _monitorSource.Cancel();
                         await _brokerService.ClosePosition();
                         _brokerService.NotifyFinished(action.Currency, false);
-                        await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTPSL.Price);
+                        await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTakeProfit.Price);
 
                         //Open BUY Position
                         if (_botConfig.DefaultTakeProfitEnabled)
@@ -125,6 +122,8 @@ namespace TradingBot.Services
                         }
                         else
                         {
+                            if (strategyAdvancedAction == null)
+                                throw new Exception("Request pip take profit, but strategy advanced action is null");
                             await TradingView_OnAction(sender, new StrategyAdvancedAction()
                             {
                                 Buy = true,
@@ -139,12 +138,13 @@ namespace TradingBot.Services
                     // Doesnt have any position
                     else if (!_brokerService.HasPosition)
                     {
-                        await _brokerService.RequestBuy(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
+                        await _brokerService.RequestBuy(action.Currency, calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
 
                         _monitorSource = new CancellationTokenSource();
-                        Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss, _monitorSource.Token);
+                        // ReSharper disable once UnusedVariable
+                        Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy, calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
 
-                        await _telegramBot.SendLong(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
+                        await _telegramBot.SendLong(action.Currency, calculatedTakeProfit.Price, calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
                     }
                     else if(_brokerService.HasPosition)
                     {
@@ -166,7 +166,7 @@ namespace TradingBot.Services
                         _monitorSource.Cancel();
                         await _brokerService.ClosePosition();
                         _brokerService.NotifyFinished(action.Currency, true);
-                        await _telegramBot.SendCancel(true, action.Currency, timeTaken, entered, calculatedTPSL.Price);
+                        await _telegramBot.SendCancel(true, action.Currency, timeTaken, entered, calculatedTakeProfit.Price);
 
                         //Open SELL Position
                         if (_botConfig.DefaultTakeProfitEnabled)
@@ -180,6 +180,8 @@ namespace TradingBot.Services
                         }
                         else
                         {
+                            if (strategyAdvancedAction == null)
+                                throw new Exception("Request pip take profit, but strategy advanced action is null");
                             await TradingView_OnAction(sender, new StrategyAdvancedAction()
                             {
                                 Buy = false,
@@ -193,12 +195,13 @@ namespace TradingBot.Services
                     // Doesnt have any position
                     else if (!_brokerService.HasPosition)
                     {
-                        await _brokerService.RequestSell(action.Currency, calculatedTPSL.Take, calculatedTPSL.Loss);
+                        await _brokerService.RequestSell(action.Currency, calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
 
                         _monitorSource = new CancellationTokenSource();
-                        Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy, calculatedTPSL.Take, calculatedTPSL.Loss, _monitorSource.Token);
+                        // ReSharper disable once UnusedVariable
+                        Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy, calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
 
-                        await _telegramBot.SendShort(action.Currency, calculatedTPSL.Price, calculatedTPSL.Take, calculatedTPSL.Loss);
+                        await _telegramBot.SendShort(action.Currency, calculatedTakeProfit.Price, calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
                     }
                     else if(_brokerService.HasPosition)
                     {
@@ -227,8 +230,9 @@ namespace TradingBot.Services
                 _logger.LogInformation($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.TP}\tSL: {pip.SL}]");
             }
             _webhookService.WebhookReceived += WebhookReceived;
-            _webhookService.StartListeningAsync();
-            _telegramBot.Start();
+            // ReSharper disable once UnusedVariable
+            Task webhookListeningTask = _webhookService.StartListeningAsync();
+            Task telegramBotTask = _telegramBot.Start();
             await Task.Delay(-1);
         }
 
