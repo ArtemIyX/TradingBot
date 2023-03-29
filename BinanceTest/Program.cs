@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Bybit.Net.Clients;
+using Bybit.Net.Enums;
+using Bybit.Net.Objects;
+using CryptoExchange.Net.Authentication;
 using Newtonsoft.Json;
 
 namespace BinanceAPIExample
@@ -9,40 +13,61 @@ namespace BinanceAPIExample
     {
         static async Task Main(string[] args)
         {
-            var baseUrl = "https://api.binance.com";
-            var symbol = "BTCUSDT";
-            var interval = "1m";
-            var limit = 10;
-
-            var endpoint = $"/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}";
-            var url = baseUrl + endpoint;
-
-
-            using (var httpClient = new HttpClient())
+            string key = "MNEUPWOPOEYAXCQSTN";
+            string secret = "WRGRMKYIBQHYMLDEIWLWZFWKFABWSDGCOXTF";
+            BybitClient bybitClient = new BybitClient(new BybitClientOptions
             {
-                var response = await httpClient.GetAsync(url);
-
-                if (response.IsSuccessStatusCode)
+                ApiCredentials = new ApiCredentials(key, secret)
+            });
+            decimal balance = 0.0m;
+            var balanceRes = await bybitClient.UsdPerpetualApi.Account.GetBalancesAsync();
+            var usdt = balanceRes.Data.FirstOrDefault(x => x.Key == "USDT");
+            balance = usdt.Value.AvailableBalance;
+            Console.WriteLine("Available balance: " + balance);
+            decimal percent = 0.1m;
+            decimal leverage = 10.0m;
+            decimal price = 0.8842m;
+            decimal qty = Math.Round((((balance * percent) * leverage) / price), 2);
+            Console.WriteLine("Placing order async on XNOUSDT, qty: " + qty);
+            try
+            {
+                var res = await bybitClient.UsdPerpetualApi.Trading.PlaceOrderAsync(
+                    symbol: "XNOUSDT",
+                    side: OrderSide.Buy,
+                    type: OrderType.Market,
+                    quantity: qty,
+                    timeInForce: TimeInForce.GoodTillCanceled,
+                    reduceOnly: false,
+                    closeOnTrigger: false,
+                    positionMode: PositionMode.OneWay,
+                    takeProfitPrice: 1.0m, stopLossPrice: 0.85m);
+                if (!res.Success)
                 {
-                    var json = await response.Content.ReadAsStringAsync();
-                    var data = JsonConvert.DeserializeObject<object[][]>(json);
-
-                    
-                    foreach (var candle in data)
-                    {
-                        Console.WriteLine($"[Open time: {candle[0]} {candle[0].GetType()}" +
-                            $"\nOpen: {candle[1]} {candle[1].GetType()}, " +
-                            $"\nHigh: {candle[2]} {candle[2].GetType()}, " +
-                            $"\nLow: {candle[3]} {candle[3].GetType()}, " +
-                            $"\nClose: {candle[4]} {candle[4].GetType()}, " +
-                            $"\nVolume: {candle[5]} {candle[5].GetType()}, " +
-                            $"\nClose time: {candle[6]} {candle[6].GetType()}]");
-                    }
+                    Console.WriteLine(res.Error.Message);
                 }
                 else
                 {
-                    Console.WriteLine($"Error: {response.StatusCode}");
+                    Console.WriteLine();
+                    await Task.Delay(2500);
+                    Console.WriteLine("Canceling order...");
+                    var res2 = await bybitClient.UsdPerpetualApi.Trading.PlaceOrderAsync(
+                        symbol: "XNOUSDT",
+                        side: OrderSide.Sell,
+                        type: OrderType.Market,
+                        quantity: 1.0m,
+                        timeInForce: TimeInForce.GoodTillCanceled,
+                        reduceOnly: true,
+                        closeOnTrigger: false,
+                        positionMode: PositionMode.OneWay);
+                    if (!res2.Success)
+                    {
+                        Console.WriteLine(res2.Error.Message);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("ERROR: " + ex.Message);
             }
         }
     }

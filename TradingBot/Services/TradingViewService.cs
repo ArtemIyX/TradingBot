@@ -1,15 +1,6 @@
-﻿using CryptoExchange.Net.Requests;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
 using TradingBot.Data;
 
 namespace TradingBot.Services
@@ -19,7 +10,6 @@ namespace TradingBot.Services
         public bool Buy { get; set; }
         public CryptoCurrency Currency { get; set; }
         public decimal Take { get; set; }
-       
     }
 
     public class StrategyAdvancedAction : StrategyAction
@@ -35,6 +25,7 @@ namespace TradingBot.Services
     }
 
     public delegate Task StrategyActionDelegate(object? sender, StrategyAction action);
+
     public delegate Task StrategyStopDelegate(object? sender, StrategyStop stop);
 
     internal class TradingViewService
@@ -51,7 +42,7 @@ namespace TradingBot.Services
         private bool _exucuting = false;
 
         public TradingViewService(IConfiguration config,
-                         ILogger<WebhookService> logger)
+            ILogger<WebhookService> logger)
         {
             _config = config;
             _logger = logger;
@@ -73,12 +64,14 @@ namespace TradingBot.Services
                 _logger.LogError("Can not process request, already have open reqeust");
                 return;
             }
+
             try
             {
-                TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ?? throw new Exception("Can not parse request");
-                CryptoCurrency currency = request.Currency.ToBinanceCurrency();
-                
-                if(request.Key != _botConfig.SecretKey)
+                TradingViewRequest request = JsonConvert.DeserializeObject<TradingViewRequest>(json) ??
+                                             throw new Exception("Can not parse request");
+                CryptoCurrency currency = request.Currency.ToCrtypoCurrency();
+
+                if (request.Key != _botConfig.SecretKey)
                 {
                     throw new Exception("Invalid secret key");
                 }
@@ -88,39 +81,29 @@ namespace TradingBot.Services
                     bool buy = request.Action == "BUY";
                     _exucuting = true;
                     // Pip tp/sl
-                    if (!_botConfig.DefaultTakeProfitEnabled)
+
+                    BinancePip? needPip = _botConfig.Pips.Find(x => x.Currency == request.Currency.ToString());
+                    // if we dont have pip
+                    if (needPip == null)
                     {
-                        BinancePip? needPip = _botConfig.Pips.Find(x => x.Currency == request.Currency.ToString());
-                        // if we dont have pip
-                        if (needPip == null)
-                        {
-                            throw new Exception($"Pip profit enabled, but can not find {currency} in settings");
-                        }
-                        OnAction?.Invoke(this, new StrategyAdvancedAction()
-                        {
-                            Buy = buy,
-                            Currency = currency,
-                            Take = needPip.Tp,
-                            Loss = needPip.Sl,
-                            PipSize = needPip.PipSize
-                        });
+                        throw new Exception($"Pip profit enabled, but can not find {currency} in settings");
                     }
-                    else
+
+                    OnAction?.Invoke(this, new StrategyAdvancedAction()
                     {
-                        OnAction?.Invoke(this, new StrategyAction()
-                        {
-                            Buy = buy,
-                            Currency = currency,
-                            Take = _botConfig.DefaultTakeProfit,
-                        });
-                    }
+                        Buy = buy,
+                        Currency = currency,
+                        Take = needPip.Tp,
+                        Loss = needPip.Sl,
+                        PipSize = needPip.PipSize
+                    });
                 }
                 else
                 {
                     throw new Exception($"Unknown Request.Action ({request.Action})");
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex.Message);
                 _exucuting = false;

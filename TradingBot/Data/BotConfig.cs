@@ -13,23 +13,17 @@ namespace TradingBot.Data
         {
             
         }
-        public BotConfig(string? webhookUrl, string? secretKey, bool useBinance, bool cancel, bool defaultTakeProfitEnabled, decimal defaultTakeProfit, List<BinancePip>? pips)
+        public BotConfig(string? webhookUrl, string? secretKey,bool cancel, List<BinancePip>? pips)
         {
             WebhookUrl = webhookUrl;
             SecretKey = secretKey;
-            UseBinance = useBinance;
             Cancel = cancel;
-            DefaultTakeProfitEnabled = defaultTakeProfitEnabled;
-            DefaultTakeProfit = defaultTakeProfit;
             Pips = pips;
         }
 
         public string? WebhookUrl { get; set; }
         public string? SecretKey { get; set; }
-        public bool UseBinance { get; set; }
         public bool Cancel { get; set; }
-        public bool DefaultTakeProfitEnabled { get; set; }
-        public decimal DefaultTakeProfit { get; set; }
         public List<BinancePip>? Pips { get; set; }
     }
 

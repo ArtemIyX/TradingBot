@@ -31,6 +31,7 @@ class WebhookService
     public async Task StartListeningAsync()
     {
         // Create an HTTP listener object and start it
+        _httpListener = new HttpListener();
         _logger.LogInformation($"Listening for webhooks on {_botConfig.WebhookUrl}...");
         _httpListener.Prefixes.Add(_botConfig.WebhookUrl ?? throw new InvalidOperationException());
         _httpListener.Start();
@@ -44,7 +45,7 @@ class WebhookService
 
                 // Read the request body
                 byte[] body = new byte[context.Request.ContentLength64];
-                context.Request.InputStream.Read(body, 0, body.Length);
+                var read = await context.Request.InputStream.ReadAsync(body, 0, body.Length);
                 string requestBody = Encoding.UTF8.GetString(body);
 
                 // Raise the WebhookReceived event with the received data
@@ -61,7 +62,7 @@ class WebhookService
             }
         }
     }
-    public void StopListeting()
+    public void StopListening()
     {
         _httpListener.Stop();
         _httpListener.Close();
