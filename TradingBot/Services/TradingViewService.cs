@@ -61,7 +61,7 @@ namespace TradingBot.Services
             _logger.LogInformation($"Request: {json}");
             if (_exucuting)
             {
-                _logger.LogError("Can not process request, already have open reqeust");
+                _logger.LogError("Can not process request, already have pending reqeust");
                 return;
             }
 

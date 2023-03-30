@@ -270,7 +270,7 @@ internal class BrokerService
         decimal balance = await GetUsdtFuturesBalance();
         decimal percent = _exchangeServiceConfig.OrderSizePercent;
         decimal leverage = _exchangeServiceConfig.Leverage;
-        decimal qty = Math.Round((((balance * percent) * leverage) / cost), 2);
+        decimal qty = Math.Round((((balance * percent) * leverage) / cost), 4);
 
         // Log trade details
         _logger.LogInformation(
@@ -290,18 +290,21 @@ internal class BrokerService
                 quantity: qty,
                 timeInForce: Bybit.Net.Enums.TimeInForce.GoodTillCanceled,
                 reduceOnly: false,
-                closeOnTrigger: true,
+                closeOnTrigger: false,
                 positionMode: PositionMode.OneWay,
                 takeProfitPrice: takeProfit,
                 stopLossPrice: stopLoss);
 
-        OrderId = openPositionRes.Data.Id;
-        Qty = qty;
-        
+
         // Throw exception if order placement was unsuccessful
         if (!openPositionRes.Success)
-            throw new Exception(openPositionRes.Error.Message);
-       
+            throw new Exception("Open position error:" + openPositionRes?.Error?.Message);
+
+        if (openPositionRes.Data == null)
+            throw new Exception("OpenPosition.Data is null");
+
+        OrderId = openPositionRes.Data.Id;
+        Qty = qty;
     }
 
     public async Task RequestOrder(bool longSide, CryptoCurrency currency, decimal takeProfit, decimal stopLoss)

@@ -106,7 +106,7 @@ namespace TradingBot.Services
                              _brokerService.CurrentCurrency == action.Currency)
                     {
                         //Close SELL Position by market price
-
+                        _logger.LogInformation("Trend reverse: Close SELL position by market price");
                         _monitorSource.Cancel();
                         await _brokerService.ClosePosition();
                         _brokerService.NotifyFinished(action.Currency, false);
@@ -116,6 +116,7 @@ namespace TradingBot.Services
 
                         if (strategyAdvancedAction == null)
                             throw new Exception("Request pip take profit, but strategy advanced action is null");
+                        _logger.LogInformation("Trend reverse: Open BUY position");
                         await TradingView_OnAction(sender, new StrategyAdvancedAction()
                         {
                             Buy = true,
@@ -129,6 +130,7 @@ namespace TradingBot.Services
                     // Doesnt have any position
                     else if (!_brokerService.HasPosition)
                     {
+                        _logger.LogInformation("Bot is free, reqeusting BUY position");
                         await _brokerService.RequestBuy(action.Currency, calculatedTakeProfit.Take,
                             calculatedTakeProfit.Loss);
 
@@ -161,6 +163,7 @@ namespace TradingBot.Services
                              _brokerService.CurrentCurrency == action.Currency)
                     {
                         //Close BUY Position by market price
+                        _logger.LogInformation("Trend reverse: Close BUY position by market price");
                         _monitorSource.Cancel();
                         await _brokerService.ClosePosition();
                         _brokerService.NotifyFinished(action.Currency, true);
@@ -169,6 +172,8 @@ namespace TradingBot.Services
                         
                         if (strategyAdvancedAction == null)
                             throw new Exception("Request pip take profit, but strategy advanced action is null");
+
+                        _logger.LogInformation("Trend reverse: Open SELL position");
                         await TradingView_OnAction(sender, new StrategyAdvancedAction()
                         {
                             Buy = false,
@@ -181,6 +186,7 @@ namespace TradingBot.Services
                     // Doesnt have any position
                     else if (!_brokerService.HasPosition)
                     {
+                        _logger.LogInformation("Bot is free, reqeusting SELL position");
                         await _brokerService.RequestSell(action.Currency, calculatedTakeProfit.Take,
                             calculatedTakeProfit.Loss);
 
