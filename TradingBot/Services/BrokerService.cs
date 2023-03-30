@@ -277,8 +277,8 @@ internal class BrokerService
             $"Trade: {side.ToString()} {qty} {currency.ToString()}: {cost}, TP: {takeProfit}, SL: {stopLoss}");
 
         // Round take profit and stop loss prices to 2 decimal places
-        takeProfit = Math.Round(takeProfit, 2);
-        stopLoss = Math.Round(stopLoss, 2);
+        takeProfit = Math.Round(takeProfit, 4);
+        stopLoss = Math.Round(stopLoss, 4);
 
         _logger.LogWarning($"Placing trade on bybit...");
         // Place market order using Binance API
