@@ -229,6 +229,7 @@ internal class BrokerService
             Enter = 0.0m;
             OrderId = "";
             OrderStarted = DateTime.MinValue;
+            Qty = 0.0m;
         }
     }
 
@@ -261,7 +262,7 @@ internal class BrokerService
     private async Task RequestByBitOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency, decimal cost,
         decimal takeProfit, decimal stopLoss)
     {
-        _logger.LogWarning($"Interacting with finances, as the status is ON)");
+        _logger.LogWarning($"Interacting with finances, as the status is ON");
         await _bybitClient.UsdPerpetualApi.Account.SetLeverageAsync(currency.ToString(),
             buyLeverage: _exchangeServiceConfig.Leverage, sellLeverage: _exchangeServiceConfig.Leverage);
         _logger.LogInformation($"'{currency.ToString()}' Set Leverage to {_exchangeServiceConfig.Leverage}x");
@@ -293,7 +294,8 @@ internal class BrokerService
                 closeOnTrigger: false,
                 positionMode: PositionMode.OneWay,
                 takeProfitPrice: takeProfit,
-                stopLossPrice: stopLoss);
+                stopLossPrice: stopLoss,
+                receiveWindow: 15000);
 
 
         // Throw exception if order placement was unsuccessful
@@ -355,9 +357,10 @@ internal class BrokerService
                 reduceOnly: true,
                 closeOnTrigger: false,
                 positionMode: PositionMode.OneWay);
+
             if (!closeRes.Success)
             {
-                throw new Exception(closeRes.Error.Message);
+                throw new Exception("Close result error:" + closeRes.Error.Message);
             }
         }
         else
