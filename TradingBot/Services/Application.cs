@@ -136,8 +136,8 @@ namespace TradingBot.Services
 
                         _monitorSource = new CancellationTokenSource();
                         // ReSharper disable once UnusedVariable
-                        Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy,
-                            calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
+                        //Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy,
+                        //    calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
 
                         await _telegramBot.SendLong(action.Currency, calculatedTakeProfit.Price,
                             calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
@@ -192,8 +192,8 @@ namespace TradingBot.Services
 
                         _monitorSource = new CancellationTokenSource();
                         // ReSharper disable once UnusedVariable
-                        Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy,
-                            calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
+                        //Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy,
+                        //    calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
 
                         await _telegramBot.SendShort(action.Currency, calculatedTakeProfit.Price,
                             calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
@@ -226,7 +226,7 @@ namespace TradingBot.Services
             {
                 Console.WriteLine($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.Tp}\tSL: {pip.Sl}]");
             }
-
+            await _brokerService.ConnectToStream();
             _webhookService.WebhookReceived += WebhookReceived;
             // ReSharper disable once UnusedVariable
             Task webhookListeningTask = _webhookService.StartListeningAsync();

@@ -5,7 +5,7 @@ VisualStudioVersion = 17.4.33122.133
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot", "TradingBot\TradingBot.csproj", "{544CAE26-72F2-4E39-8413-773CA5515792}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LinuxTimeChanger", "LinuxTimeChanger\LinuxTimeChanger.csproj", "{C9ED888E-898B-49C5-8DE7-E892B7CEB1AF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinuxTimeChanger", "LinuxTimeChanger\LinuxTimeChanger.csproj", "{C9ED888E-898B-49C5-8DE7-E892B7CEB1AF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

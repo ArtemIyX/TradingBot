@@ -1,16 +1,17 @@
 ﻿
 using Bybit.Net.Clients;
+using Bybit.Net.Enums;
 using Bybit.Net.Objects;
+using Bybit.Net.Objects.Models;
+using Bybit.Net.Objects.Models.Socket;
 using CryptoExchange.Net.Authentication;
 using CryptoExchange.Net.Objects;
+using CryptoExchange.Net.Sockets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 using System.Globalization;
-using Bybit.Net.Enums;
-using Bybit.Net.Objects.Models;
 using TradingBot.Data;
 
 namespace TradingBot.Services;
@@ -23,6 +24,7 @@ internal class BrokerService
     private readonly ExchangeServiceConfig _exchangeServiceConfig;
     private readonly BotConfig _botConfig;
     private readonly BybitClient _bybitClient;
+    private readonly BybitSocketClient _bybitSocketClient;
 
     public CryptoCurrency CurrentCurrency { get; private set; }
     public bool HasPosition { get; private set; }
@@ -31,6 +33,7 @@ internal class BrokerService
     public string OrderId { get; private set; }
     public decimal Qty { get; private set; }
     public DateTime OrderStarted { get; private set; }
+
 
     private DateTime LastTimeChecked { get; set; }
 
@@ -49,12 +52,80 @@ internal class BrokerService
         _exchangeServiceConfig = _config.GetSection("ExchangeService").Get<ExchangeServiceConfig>();
         _botConfig = _config.GetSection("Bot").Get<BotConfig>() ??
                      throw new InvalidOperationException("Can not get 'Bot' from settings");
-        
-        BybitClientOptions bybitClientOptions = new BybitClientOptions()
+
+        var credits = new ApiCredentials(_exchangeServiceConfig.ApiKey, _exchangeServiceConfig.SecretKey);
+
+        _bybitClient = new BybitClient(new BybitClientOptions()
         {
-            ApiCredentials = new ApiCredentials(_exchangeServiceConfig.ApiKey, _exchangeServiceConfig.SecretKey)
-        };
-        _bybitClient = new BybitClient(bybitClientOptions);
+            ApiCredentials = credits
+        });
+
+        _bybitSocketClient = new BybitSocketClient(new BybitSocketClientOptions()
+        {
+            ApiCredentials = credits
+        });
+
+    }
+
+    public async Task ConnectToStream()
+    {
+        _logger.LogInformation("Connecting to ByBit stream api");
+        await _bybitSocketClient.UsdPerpetualStreams.SubscribeToOrderUpdatesAsync(OnOrderUpdate);
+    }
+
+    private void TryNotify(OrderSide side, bool tp, decimal price)
+    {
+        if (!HasPosition)
+        {
+            _logger.LogWarning("Bot dont have position to close");
+            return;
+        }
+        bool sellPos = side == OrderSide.Sell && !Buy;
+        bool buyPos = side == OrderSide.Buy && Buy;
+        bool correctPos = sellPos || buyPos;
+        if (!correctPos)
+        {
+            string sidestr = Buy ? "Buy" : "Sell";
+            _logger.LogWarning($"Uncorrect position ({side}, when we have {sidestr})");
+            return;
+        }
+        TpSlReached?.Invoke(new MonitorResult()
+        {
+            Price = price,
+            Buy = this.Buy,
+            Take = tp,
+            Currency = CurrentCurrency
+        });
+
+    }
+
+    private void OnOrderUpdate(DataEvent<IEnumerable<BybitUsdPerpetualOrderUpdate>> dataUpdate)
+    {
+        BybitUsdPerpetualOrderUpdate? update = dataUpdate.Data.FirstOrDefault();
+        if (update == null)
+            return;
+
+        string updateType = update.CreateType;
+        string info = $"{update.Symbol} {update.Side}";
+
+
+        switch (updateType)
+        {
+            case "CreateByTakeProfit":
+                _logger.LogInformation($"Stream: {info} was closed by take profit");
+                TryNotify(update.Side, true, update.LastTradePrice);
+                break;
+            case "CreateByStopLoss":
+                _logger.LogInformation($"Stream: {info} was closed by stop loss");
+                TryNotify(update.Side, false, update.LastTradePrice);
+                break;
+            case "CreateByClosing":
+                _logger.LogInformation($"Stream: {info} was closed");
+                break;
+            default:
+                _logger.LogInformation($"Stream: {info} was {update.CreateType}");
+                break;
+        }
     }
 
     public async Task StartMonitorCurrency(CryptoCurrency currency, bool buy, decimal take, decimal stop,
@@ -71,7 +142,7 @@ internal class BrokerService
 
         void Print(decimal currentPrice)
         {
-            Console.Clear();
+            //Console.Clear();
             Console.WriteLine($"Monitoring {currency}: {currentPrice} (TP: {take}, SP: {stop})");
         }
 
@@ -129,7 +200,7 @@ internal class BrokerService
                 }
             }
 
-            await Task.Delay(1000, cancellationToken);
+            await Task.Delay(50, cancellationToken);
         }
     }
 
@@ -215,8 +286,8 @@ internal class BrokerService
             };
         }
     }
-    
-   
+
+
     // This method is called when a buy or sell order is finished executing.
     // It takes a BinanceCurrency object representing the currency of the order and a boolean indicating whether it was a buy or sell order.
     public void NotifyFinished(CryptoCurrency currency, bool buyPosition)
@@ -233,6 +304,7 @@ internal class BrokerService
             OrderId = "";
             OrderStarted = DateTime.MinValue;
             Qty = 0.0m;
+            Buy = false;
         }
     }
 
@@ -265,7 +337,7 @@ internal class BrokerService
     private async Task RequestByBitOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency, decimal cost,
         decimal takeProfit, decimal stopLoss)
     {
-        if((LastTimeChecked - DateTime.Now).TotalMinutes > 60)
+        if ((LastTimeChecked - DateTime.Now).TotalMinutes > 60)
         {
             await ServiceExtensions.SyncTime(_logger);
             LastTimeChecked = DateTime.Now;
@@ -332,9 +404,9 @@ internal class BrokerService
         {
             await RequestByBitOrder(
                 longSide ? Bybit.Net.Enums.OrderSide.Buy : Bybit.Net.Enums.OrderSide.Sell,
-                currency, 
-                cost, 
-                takeProfit, 
+                currency,
+                cost,
+                takeProfit,
                 stopLoss);
         }
         else
@@ -357,7 +429,7 @@ internal class BrokerService
         {
             WebCallResult<BybitUsdPerpetualOrder> closeRes = await _bybitClient.UsdPerpetualApi.Trading.PlaceOrderAsync(
                 symbol: CurrentCurrency.ToString(),
-                side: Buy? OrderSide.Sell : OrderSide.Buy,
+                side: Buy ? OrderSide.Sell : OrderSide.Buy,
                 type: OrderType.Market,
                 quantity: Qty,
                 timeInForce: TimeInForce.GoodTillCanceled,
