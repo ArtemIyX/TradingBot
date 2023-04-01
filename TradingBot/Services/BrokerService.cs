@@ -32,11 +32,14 @@ internal class BrokerService
     public decimal Qty { get; private set; }
     public DateTime OrderStarted { get; private set; }
 
+    private DateTime LastTimeChecked { get; set; }
+
     public event CurrencyTpSlDelegate? TpSlReached;
 
     public BrokerService(IConfiguration config,
         ILogger<WebhookService> logger)
     {
+        LastTimeChecked = DateTime.Now;
         OrderId = "";
         CurrentCurrency = CryptoCurrency.None;
         HasPosition = false;
@@ -69,7 +72,7 @@ internal class BrokerService
         void Print(decimal currentPrice)
         {
             Console.Clear();
-            _logger.LogInformation($"Monitoring {currency}: {currentPrice} (TP: {take}, SP: {stop})");
+            Console.WriteLine($"Monitoring {currency}: {currentPrice} (TP: {take}, SP: {stop})");
         }
 
         while (true)
@@ -262,6 +265,11 @@ internal class BrokerService
     private async Task RequestByBitOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency, decimal cost,
         decimal takeProfit, decimal stopLoss)
     {
+        if((LastTimeChecked - DateTime.Now).TotalMinutes > 60)
+        {
+            await ServiceExtensions.SyncTime(_logger);
+            LastTimeChecked = DateTime.Now;
+        }
         _logger.LogWarning($"Interacting with finances, as the status is ON");
         await _bybitClient.UsdPerpetualApi.Account.SetLeverageAsync(currency.ToString(),
             buyLeverage: _exchangeServiceConfig.Leverage, sellLeverage: _exchangeServiceConfig.Leverage);
@@ -294,8 +302,7 @@ internal class BrokerService
                 closeOnTrigger: false,
                 positionMode: PositionMode.OneWay,
                 takeProfitPrice: takeProfit,
-                stopLossPrice: stopLoss,
-                receiveWindow: 15000);
+                stopLossPrice: stopLoss);
 
 
         // Throw exception if order placement was unsuccessful

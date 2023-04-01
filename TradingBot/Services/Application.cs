@@ -220,10 +220,11 @@ namespace TradingBot.Services
         public async Task Start()
         {
             _logger.LogInformation("WELLSAIK ALERTS");
-            _logger.LogInformation("Pips: ");
+            await ServiceExtensions.SyncTime(_logger);
+            Console.WriteLine("Pips: ");
             foreach (var pip in _botConfig.Pips)
             {
-                _logger.LogInformation($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.Tp}\tSL: {pip.Sl}]");
+                Console.WriteLine($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.Tp}\tSL: {pip.Sl}]");
             }
 
             _webhookService.WebhookReceived += WebhookReceived;

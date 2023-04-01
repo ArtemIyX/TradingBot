@@ -1,31 +1,12 @@
-﻿using Microsoft.Extensions.Logging;
+﻿// See https://aka.ms/new-console-template for more information
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using TradingBot.Data;
 
-namespace TradingBot.Services;
-
-public static class ServiceExtensions
+try
 {
-    public static CryptoCurrency ToCrtypoCurrency(this string? input)
+    if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
     {
-        if (Enum.TryParse(input, out CryptoCurrency currency))
-        {
-            return currency;
-        }
-        return CryptoCurrency.None;
-    }
-
-    public static async Task SyncTime(ILogger logger)
-    {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            logger.LogInformation("Platform is not linux, can not sync time");
-            return;
-        }
-        logger.LogInformation("Sync time with bybit server");
-
         HttpClient client = new HttpClient();
         client.BaseAddress = new Uri("https://api.bybit.com");
 
@@ -43,7 +24,14 @@ public static class ServiceExtensions
 
         // Run the shell command to set the system time
         Process.Start("sudo", $"date -s \"{serverTime.ToString("yyyy-MM-dd HH:mm:ss")}\"").WaitForExit();
-        logger.LogInformation("New time is: " + serverTime);
-
+        Console.WriteLine($"New time: {serverTime}");
     }
+    else
+    {
+        Console.WriteLine("The current operating system is not Linux.");
+    }
+}
+catch(Exception ex)
+{
+    Console.WriteLine("Error: " + ex.Message);
 }
