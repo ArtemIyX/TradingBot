@@ -69,8 +69,9 @@ internal class BrokerService
 
     public async Task ConnectToStream()
     {
-        _logger.LogInformation("Connecting to ByBit stream api");
+
         await _bybitSocketClient.UsdPerpetualStreams.SubscribeToOrderUpdatesAsync(OnOrderUpdate);
+        _logger.LogInformation("Connected to ByBit stream api");
     }
 
     private void TryNotify(OrderSide side, bool tp, decimal price)
@@ -108,19 +109,25 @@ internal class BrokerService
         string updateType = update.CreateType;
         string info = $"{update.Symbol} {update.Side}";
 
-
+        CryptoCurrency cur = ServiceExtensions.ToCrtypoCurrency(update.Symbol);
+        OrderSide invertSide = update.Side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
         switch (updateType)
         {
+            
             case "CreateByTakeProfit":
                 _logger.LogInformation($"Stream: {info} was closed by take profit");
-                TryNotify(update.Side, true, update.LastTradePrice);
+                TryNotify(invertSide, true, update.LastTradePrice);
                 break;
             case "CreateByStopLoss":
                 _logger.LogInformation($"Stream: {info} was closed by stop loss");
-                TryNotify(update.Side, false, update.LastTradePrice);
+                TryNotify(invertSide, false, update.LastTradePrice);
                 break;
             case "CreateByClosing":
                 _logger.LogInformation($"Stream: {info} was closed");
+                if(cur == CurrentCurrency)
+                {
+                    NotifyFinished(cur, update.Side == OrderSide.Buy);
+                }
                 break;
             default:
                 _logger.LogInformation($"Stream: {info} was {update.CreateType}");

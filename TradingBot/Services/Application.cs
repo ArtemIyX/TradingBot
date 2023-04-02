@@ -190,7 +190,7 @@ namespace TradingBot.Services
                         await _brokerService.RequestSell(action.Currency, calculatedTakeProfit.Take,
                             calculatedTakeProfit.Loss);
 
-                        _monitorSource = new CancellationTokenSource();
+                        //_monitorSource = new CancellationTokenSource();
                         // ReSharper disable once UnusedVariable
                         //Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy,
                         //    calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
@@ -226,11 +226,11 @@ namespace TradingBot.Services
             {
                 Console.WriteLine($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.Tp}\tSL: {pip.Sl}]");
             }
-            await _brokerService.ConnectToStream();
             _webhookService.WebhookReceived += WebhookReceived;
             // ReSharper disable once UnusedVariable
             Task webhookListeningTask = _webhookService.StartListeningAsync();
             Task telegramBotTask = _telegramBot.Start();
+            await _brokerService.ConnectToStream();
             await Task.Delay(-1);
         }
 

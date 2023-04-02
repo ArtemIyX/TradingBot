@@ -41,6 +41,8 @@ namespace TradingBot.Services
 
         private bool _exucuting = false;
 
+        private readonly List<string> requestQueue = new List<string>();
+
         public TradingViewService(IConfiguration config,
             ILogger<WebhookService> logger)
         {
@@ -53,7 +55,17 @@ namespace TradingBot.Services
 
         public void NotifyFinish()
         {
+            _logger.LogInformation($"Finished request executing");
             _exucuting = false;
+            if (requestQueue.Count > 0)
+            {
+                _logger.LogInformation($"Request queue have {requestQueue.Count} requests");
+                string request = requestQueue.First();
+                _logger.LogInformation($"Will execute first request in queue");
+                requestQueue.RemoveAt(0);
+                ProcessRequest(request);
+            }
+           
         }
 
         public void ProcessRequest(string json)
@@ -61,7 +73,8 @@ namespace TradingBot.Services
             _logger.LogInformation($"Request: {json}");
             if (_exucuting)
             {
-                _logger.LogError("Can not process request, already have pending reqeust");
+                requestQueue.Add(json);
+                _logger.LogWarning("Can not process request, already have pending reqeust. Added to queue.");
                 return;
             }
 
