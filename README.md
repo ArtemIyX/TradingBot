@@ -2,7 +2,7 @@
 This is a trading bot designed to help you trade cryptocurrencies on the ByBit exchange. The bot is designed to receive trading signals via webhook, send notifications via Telegram, and make orders on the ByBit exchange. It is also highly customizable, with flexible settings for each currency and the ability to use a TradingView strategy.
 ## Installation
 To install the trading bot, you will need to follow these steps:|
-1. Download the bot and place it on your Linux server. In the case of vinux, you will have to compile it yourself.
+1. Download the bot and place it on your Linux server. In the case of Windows, you will have to compile it yourself.
 2. Make sure you have .net 6.0 installed on your machine.
 3. Make the TradingBot file runable with **'chmod +x'**.
 4. In the **'appsettings.json'** file, you will need to specify the following settings:
