@@ -133,12 +133,6 @@ namespace TradingBot.Services
                         _logger.LogInformation("Bot is free, reqeusting BUY position");
                         await _brokerService.RequestBuy(action.Currency, calculatedTakeProfit.Take,
                             calculatedTakeProfit.Loss);
-
-                        _monitorSource = new CancellationTokenSource();
-                        // ReSharper disable once UnusedVariable
-                        //Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy,
-                        //    calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
-
                         await _telegramBot.SendLong(action.Currency, calculatedTakeProfit.Price,
                             calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
                     }
