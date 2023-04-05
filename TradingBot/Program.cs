@@ -1,10 +1,14 @@
 ﻿
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using TradingBot.Data.Config;
 using TradingBot.Services;
+using TradingDataBaseLib;
+using TradingDataBaseLib.Services;
 
 namespace TradingBot;
 
@@ -33,21 +37,31 @@ public static class Programm
     static IHost AppStartup()
     {
         // Create a new configuration builder.
-        ConfigurationBuilder builder = new ConfigurationBuilder();
+        ConfigurationBuilder configBuilder = new ConfigurationBuilder();
 
         // Call the ConfigSetup method to configure the builder.
-        ConfigSetup(builder);
+        ConfigSetup(configBuilder);
 
+        IConfiguration config = configBuilder.Build();
         // Create a new logger using the configuration built by the ConfigurationBuilder.
         Log.Logger = new LoggerConfiguration()
-            .ReadFrom.Configuration(builder.Build())
+            .ReadFrom.Configuration(configBuilder.Build())
             .Enrich.FromLogContext()
             .CreateLogger();
+
+        DataBaseConfig dbConfig = config.GetSection("DataBase").Get<DataBaseConfig>() ?? throw new Exception("Can not get 'DataBase' appsettings section");
 
         // Create a new instance of the host with the default settings, configure services, add Serilog, and build the host.
         IHost host = Host.CreateDefaultBuilder().ConfigureServices((context, services) =>
         {
             services.AddSingleton<Application>();
+
+            services.AddDbContext<TradingContext>(x =>
+            {
+                x.UseMySQL(dbConfig.Connection);
+            });
+
+            services.AddTransient<TradingActionService>();
             services.AddTransient<WebhookService>();
             services.AddTransient<TelegramService>();
             services.AddTransient<BrokerService>();

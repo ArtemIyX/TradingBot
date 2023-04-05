@@ -13,6 +13,7 @@ using Newtonsoft.Json.Linq;
 using RestSharp;
 using System.Globalization;
 using TradingBot.Data;
+using TradingBot.Data.Config;
 using TradingBot.Extensions;
 
 namespace TradingBot.Services;

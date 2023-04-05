@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TradingBot.Data
+namespace TradingBot.Data.Config
 {
     [Serializable]
     internal struct TelegramConfig

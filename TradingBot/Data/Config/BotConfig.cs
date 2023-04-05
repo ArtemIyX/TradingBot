@@ -4,16 +4,16 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TradingBot.Data
+namespace TradingBot.Data.Config
 {
     [Serializable]
     internal class BotConfig
     {
         public BotConfig()
         {
-            
+
         }
-        public BotConfig(string? webhookUrl, string? secretKey,bool cancel, List<BinancePip>? pips)
+        public BotConfig(string? webhookUrl, string? secretKey, bool cancel, List<BinancePip>? pips)
         {
             WebhookUrl = webhookUrl;
             SecretKey = secretKey;
@@ -27,11 +27,12 @@ namespace TradingBot.Data
         public List<BinancePip>? Pips { get; set; }
     }
 
+    [Serializable]
     public class BinancePip
     {
         public BinancePip()
         {
-            
+
         }
         public BinancePip(string? currency, decimal pipSize, decimal tp, decimal sl)
         {

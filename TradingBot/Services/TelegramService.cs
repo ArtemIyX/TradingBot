@@ -14,6 +14,7 @@ using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
 using TradingBot.Data;
+using TradingBot.Data.Config;
 using static System.Collections.Specialized.BitVector32;
 
 namespace TradingBot.Services;

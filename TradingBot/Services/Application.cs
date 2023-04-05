@@ -1,7 +1,11 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using CryptoExchange.Net.CommonObjects;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using MySqlX.XDevAPI.Common;
 using TradingBot.Data;
+using TradingBot.Data.Config;
 using TradingBot.Extensions;
+using TradingDataBaseLib.Services;
 
 namespace TradingBot.Services
 {
@@ -15,6 +19,7 @@ namespace TradingBot.Services
         private readonly TelegramService _telegramBot;
         private readonly BrokerService _brokerService;
         private readonly TradingViewService _tradingViewService;
+        private readonly TradingActionService _tradingActionService;
         private readonly BotConfig _botConfig;
         private CancellationTokenSource _monitorSource;
 
@@ -25,7 +30,8 @@ namespace TradingBot.Services
             WebhookService webhookService,
             TelegramService telegramBot,
             BrokerService brokerService,
-            TradingViewService tradingViewService)
+            TradingViewService tradingViewService,
+            TradingActionService tradingActionService)
         {
             _monitorSource = new CancellationTokenSource();
             _logger = logger;
@@ -34,8 +40,11 @@ namespace TradingBot.Services
                          throw new InvalidOperationException("Can not get 'Bot' settings");
             _webhookService = webhookService;
             _telegramBot = telegramBot;
+            _tradingActionService = tradingActionService;
+
             _brokerService = brokerService;
             _brokerService.TpSlReached += BrokerServiceTpSlReached;
+
             _tradingViewService = tradingViewService;
             _tradingViewService.OnAction += TradingView_OnAction;
             _tradingViewService.OnStop += TradingView_OnStop;
@@ -51,14 +60,18 @@ namespace TradingBot.Services
             decimal exitPrice = result.Price;
             decimal enterPrice = _brokerService.Enter;
 
+            decimal balance = await _brokerService.GetUsdtFuturesBalance();
+
             // Notify binance service
             _brokerService.NotifyFinished(result.Currency, result.Buy);
             if (result.Take)
             {
+                await _tradingActionService.AddTradingAction(result.Buy, result.Currency.ToString(), balance, "TakeProfit");
                 await _telegramBot.SendTakeProfit(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
             else
             {
+                await _tradingActionService.AddTradingAction(result.Buy, result.Currency.ToString(), balance, "StopLoss");
                 await _telegramBot.SendStopLoss(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
         }
@@ -95,26 +108,32 @@ namespace TradingBot.Services
                 TimeSpan timeTaken = DateTime.Now - _brokerService.OrderStarted;
                 if (action.Buy)
                 {
-                    // Has BUY position with same currency
+                    // Check if the bot already has a BUY position with the same currency
                     if (_brokerService.HasPosition && _brokerService.Buy &&
                         _brokerService.CurrentCurrency == action.Currency)
                     {
+                        // Log a warning message and do not execute the action
                         _logger.LogWarning(
                             $"Can not execute action: Bot already has BUY position ({_brokerService.CurrentCurrency})");
                     }
-                    // Has SELL position with same currency
+                    // Check if the bot already has a SELL position with the same currency
                     else if (_brokerService.HasPosition && (!_brokerService.Buy) &&
                              _brokerService.CurrentCurrency == action.Currency)
                     {
-                        //Close SELL Position by market price
+                        // Close the SELL position by market price
                         _logger.LogInformation("Trend reverse: Close SELL position by market price");
                         _monitorSource.Cancel();
                         await _brokerService.ClosePosition();
+
+                        // Get the current balance and add a trading action to the history
+                        decimal balance = await _brokerService.GetUsdtFuturesBalance();
+                        await _tradingActionService.AddTradingAction(false, action.Currency.ToString(), balance, "Cancel");
+
+                        // Notify that the action has finished and send a Telegram message
                         _brokerService.NotifyFinished(action.Currency, false);
-                        await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered,
-                            calculatedTakeProfit.Price);
+                        await _telegramBot.SendCancel(false, action.Currency, timeTaken, entered, calculatedTakeProfit.Price);
 
-
+                        // Check if a pip take profit is requested and open a new BUY position
                         if (strategyAdvancedAction == null)
                             throw new Exception("Request pip take profit, but strategy advanced action is null");
                         _logger.LogInformation("Trend reverse: Open BUY position");
@@ -128,15 +147,14 @@ namespace TradingBot.Services
                         });
                         return;
                     }
-                    // Doesnt have any position
+                    // Check if the bot does not have any position and request a BUY position
                     else if (!_brokerService.HasPosition)
                     {
                         _logger.LogInformation("Bot is free, reqeusting BUY position");
-                        await _brokerService.RequestBuy(action.Currency, calculatedTakeProfit.Take,
-                            calculatedTakeProfit.Loss);
-                        await _telegramBot.SendLong(action.Currency, calculatedTakeProfit.Price,
-                            calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
+                        await _brokerService.RequestBuy(action.Currency, calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
+                        await _telegramBot.SendLong(action.Currency, calculatedTakeProfit.Price, calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
                     }
+                    // Check if the bot already has a position and log a warning message
                     else if (_brokerService.HasPosition)
                     {
                         string buyString = _brokerService.Buy ? "Buy" : "Sell";
@@ -146,28 +164,32 @@ namespace TradingBot.Services
                 }
                 else
                 {
-                    // Has SELL position with same currency
-                    if (_brokerService.HasPosition && !_brokerService.Buy &&
-                        _brokerService.CurrentCurrency == action.Currency)
+                    // Check if bot has a SELL position with the same currency
+                    if (_brokerService.HasPosition && !_brokerService.Buy && _brokerService.CurrentCurrency == action.Currency)
                     {
-                        _logger.LogWarning(
-                            $"Can not execute action: Bot already has SELL position ({_brokerService.CurrentCurrency})");
+                        _logger.LogWarning($"Can not execute action: Bot already has SELL position ({_brokerService.CurrentCurrency})");
                     }
-                    // Has BUY position with same currency
-                    else if (_brokerService.HasPosition && _brokerService.Buy &&
-                             _brokerService.CurrentCurrency == action.Currency)
+                    // Check if bot has a BUY position with the same currency
+                    else if (_brokerService.HasPosition && _brokerService.Buy && _brokerService.CurrentCurrency == action.Currency)
                     {
-                        //Close BUY Position by market price
+                        // Close the BUY position by market price
                         _logger.LogInformation("Trend reverse: Close BUY position by market price");
                         _monitorSource.Cancel();
                         await _brokerService.ClosePosition();
+
+                        // Get current balance and add trading action
+                        decimal balance = await _brokerService.GetUsdtFuturesBalance();
+                        await _tradingActionService.AddTradingAction(true, action.Currency.ToString(), balance, "Cancel");
+
+                        // Notify that the action has finished and send a message to Telegram
                         _brokerService.NotifyFinished(action.Currency, true);
-                        await _telegramBot.SendCancel(true, action.Currency, timeTaken, entered,
-                            calculatedTakeProfit.Price);
-                        
+                        await _telegramBot.SendCancel(true, action.Currency, timeTaken, entered, calculatedTakeProfit.Price);
+
+                        // Check if the advanced action is null, throw an exception if it is
                         if (strategyAdvancedAction == null)
                             throw new Exception("Request pip take profit, but strategy advanced action is null");
 
+                        // Open a SELL position
                         _logger.LogInformation("Trend reverse: Open SELL position");
                         await TradingView_OnAction(sender, new StrategyAdvancedAction()
                         {
@@ -178,26 +200,20 @@ namespace TradingBot.Services
                             PipSize = strategyAdvancedAction.PipSize
                         });
                     }
-                    // Doesnt have any position
+                    // Check if bot doesn't have any position
                     else if (!_brokerService.HasPosition)
                     {
-                        _logger.LogInformation("Bot is free, reqeusting SELL position");
-                        await _brokerService.RequestSell(action.Currency, calculatedTakeProfit.Take,
-                            calculatedTakeProfit.Loss);
+                        _logger.LogInformation("Bot is free, requesting SELL position");
+                        await _brokerService.RequestSell(action.Currency, calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
 
-                        //_monitorSource = new CancellationTokenSource();
-                        // ReSharper disable once UnusedVariable
-                        //Task monitor = _brokerService.StartMonitorCurrency(action.Currency, action.Buy,
-                        //    calculatedTakeProfit.Take, calculatedTakeProfit.Loss, _monitorSource.Token);
-
-                        await _telegramBot.SendShort(action.Currency, calculatedTakeProfit.Price,
-                            calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
+                        // Send a message to Telegram
+                        await _telegramBot.SendShort(action.Currency, calculatedTakeProfit.Price, calculatedTakeProfit.Take, calculatedTakeProfit.Loss);
                     }
                     else if (_brokerService.HasPosition)
                     {
+                        // If bot already has a position, log a warning and do nothing
                         string buyString = _brokerService.Buy ? "Buy" : "Sell";
-                        _logger.LogWarning(
-                            $"Can not execute action: Bot already has position ({_brokerService.CurrentCurrency} | {buyString})");
+                        _logger.LogWarning($"Can not execute action: Bot already has position ({_brokerService.CurrentCurrency} | {buyString})");
                     }
                 }
             }
