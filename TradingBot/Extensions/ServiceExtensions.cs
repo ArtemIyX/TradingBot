@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using TradingBot.Data;
 
-namespace TradingBot.Services;
+namespace TradingBot.Extensions;
 
 public static class ServiceExtensions
 {

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TradingBot.Data;
+using TradingBot.Extensions;
 
 namespace TradingBot.Services
 {

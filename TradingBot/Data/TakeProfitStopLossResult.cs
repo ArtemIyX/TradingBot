@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Services;
+﻿namespace TradingBot.Data;
 
 public struct TakeProfitStopLossResult
 {
