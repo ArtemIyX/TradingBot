@@ -340,7 +340,7 @@ internal class BrokerService
     }
 
     private async Task RequestByBitOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency, decimal cost,
-        decimal takeProfit, decimal stopLoss)
+        decimal? takeProfit, decimal? stopLoss)
     {
         await ServiceExtensions.SyncTime(_logger);
 
@@ -355,13 +355,17 @@ internal class BrokerService
         decimal leverage = _exchangeServiceConfig.Leverage;
         decimal qty = Math.Round((((balance * percent) * leverage) / cost), 4);
 
+        string? tpInfo = takeProfit == null ? "NA" : takeProfit.ToString();
+        string? slInfo = stopLoss == null ? "NA" : stopLoss.ToString();
         // Log trade details
         _logger.LogInformation(
-            $"Trade: {side.ToString()} {qty} {currency.ToString()}: {cost}, TP: {takeProfit}, SL: {stopLoss}");
+            $"Trade: {side.ToString()} {qty} {currency.ToString()}: {cost}, TP: {tpInfo}, SL: {stopLoss}");
 
         // Round take profit and stop loss prices to 2 decimal places
-        takeProfit = Math.Round(takeProfit, 4);
-        stopLoss = Math.Round(stopLoss, 4);
+        if (takeProfit != null)
+            takeProfit = Math.Round((decimal)takeProfit, 4);
+        if(stopLoss != null)
+            stopLoss = Math.Round((decimal)stopLoss, 4);
 
         _logger.LogWarning($"Placing trade on bybit...");
         // Place market order using Binance API

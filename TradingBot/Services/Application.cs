@@ -118,10 +118,11 @@ namespace TradingBot.Services
                     }
                     // Check if the bot already has a SELL position with the same currency
                     else if (_brokerService.HasPosition && (!_brokerService.Buy) &&
-                             _brokerService.CurrentCurrency == action.Currency)
+                             _brokerService.CurrentCurrency == action.Currency &&
+                             _botConfig.Cancel)
                     {
                         // Close the SELL position by market price
-                        _logger.LogInformation("Trend reverse: Close SELL position by market price");
+                        _logger.LogInformation("Cancel: Close SELL position by market price");
                         _monitorSource.Cancel();
                         await _brokerService.ClosePosition();
 
@@ -136,15 +137,19 @@ namespace TradingBot.Services
                         // Check if a pip take profit is requested and open a new BUY position
                         if (strategyAdvancedAction == null)
                             throw new Exception("Request pip take profit, but strategy advanced action is null");
-                        _logger.LogInformation("Trend reverse: Open BUY position");
-                        await TradingView_OnAction(sender, new StrategyAdvancedAction()
+
+                        if (_botConfig.Reverse)
                         {
-                            Buy = true,
-                            Currency = strategyAdvancedAction.Currency,
-                            Take = strategyAdvancedAction.Take,
-                            Loss = strategyAdvancedAction.Loss,
-                            PipSize = strategyAdvancedAction.PipSize
-                        });
+                            _logger.LogInformation("Trend reverse: Open BUY position");
+                            await TradingView_OnAction(sender, new StrategyAdvancedAction()
+                            {
+                                Buy = true,
+                                Currency = strategyAdvancedAction.Currency,
+                                Take = strategyAdvancedAction.Take,
+                                Loss = strategyAdvancedAction.Loss,
+                                PipSize = strategyAdvancedAction.PipSize
+                            });
+                        }
                         return;
                     }
                     // Check if the bot does not have any position and request a BUY position
@@ -170,7 +175,10 @@ namespace TradingBot.Services
                         _logger.LogWarning($"Can not execute action: Bot already has SELL position ({_brokerService.CurrentCurrency})");
                     }
                     // Check if bot has a BUY position with the same currency
-                    else if (_brokerService.HasPosition && _brokerService.Buy && _brokerService.CurrentCurrency == action.Currency)
+                    else if (_brokerService.HasPosition 
+                        && _brokerService.Buy 
+                        && _brokerService.CurrentCurrency == action.Currency
+                        && _botConfig.Cancel)
                     {
                         // Close the BUY position by market price
                         _logger.LogInformation("Trend reverse: Close BUY position by market price");
@@ -190,15 +198,19 @@ namespace TradingBot.Services
                             throw new Exception("Request pip take profit, but strategy advanced action is null");
 
                         // Open a SELL position
-                        _logger.LogInformation("Trend reverse: Open SELL position");
-                        await TradingView_OnAction(sender, new StrategyAdvancedAction()
+                        if (_botConfig.Reverse)
                         {
-                            Buy = false,
-                            Currency = strategyAdvancedAction.Currency,
-                            Take = strategyAdvancedAction.Take,
-                            Loss = strategyAdvancedAction.Loss,
-                            PipSize = strategyAdvancedAction.PipSize
-                        });
+                            _logger.LogInformation("Trend reverse: Open SELL position");
+                            await TradingView_OnAction(sender, new StrategyAdvancedAction()
+                            {
+                                Buy = false,
+                                Currency = strategyAdvancedAction.Currency,
+                                Take = strategyAdvancedAction.Take,
+                                Loss = strategyAdvancedAction.Loss,
+                                PipSize = strategyAdvancedAction.PipSize
+                            });
+                        }
+                        return;
                     }
                     // Check if bot doesn't have any position
                     else if (!_brokerService.HasPosition)
