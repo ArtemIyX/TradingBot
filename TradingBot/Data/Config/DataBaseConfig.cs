@@ -8,6 +8,7 @@ namespace TradingBot.Data.Config
 {
     public class DataBaseConfig
     {
+        public bool UseDb { get; set; }
         public string Connection { get; set; }
     }
 }

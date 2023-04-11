@@ -19,7 +19,10 @@ namespace TradingDataBaseLib.Services
         {
             this._dbContext = dbContext;
             this._logger = logger;
-            _dbContext.Database.EnsureCreated();
+        }
+        public async Task EnsureCreatedDB()
+        {
+            await _dbContext.Database.EnsureCreatedAsync();
         }
 
         public async Task AddTradingAction(bool buy, string currency, decimal balance, string reason)

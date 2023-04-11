@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using RestSharp;
+using System.Configuration;
 using System.Globalization;
 using TradingBot.Data;
 using TradingBot.Data.Config;
@@ -337,6 +338,16 @@ internal class BrokerService
         {
             _logger.LogError(ex.Message);
         }
+    }
+
+    public async Task<IEnumerable<BybitKline>> GetCandles(CryptoCurrency currency, KlineInterval interval, int limit, DateTime From, DateTime To)
+    {
+        var res = await _bybitClient.DerivativesApi.ExchangeData.GetKlinesAsync(Category.Linear, currency.ToString(), interval, From, To, limit);
+        if(!res.Success)
+        {
+            throw new Exception("Can not get klines: " + res.Error?.Message);
+        }
+        return res.Data;
     }
 
     private async Task RequestByBitOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency, decimal cost,

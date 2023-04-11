@@ -21,6 +21,7 @@ namespace TradingBot.Services
         private readonly TradingViewService _tradingViewService;
         private readonly TradingActionService _tradingActionService;
         private readonly BotConfig _botConfig;
+        private readonly DataBaseConfig _dbConfig;
         private CancellationTokenSource _monitorSource;
 
 
@@ -41,6 +42,7 @@ namespace TradingBot.Services
             _webhookService = webhookService;
             _telegramBot = telegramBot;
             _tradingActionService = tradingActionService;
+            _dbConfig = config.GetSection("DataBase").Get<DataBaseConfig>() ?? throw new Exception("Can not get 'DataBase' appsettings section");
 
             _brokerService = brokerService;
             _brokerService.TpSlReached += BrokerServiceTpSlReached;
@@ -66,12 +68,14 @@ namespace TradingBot.Services
             _brokerService.NotifyFinished(result.Currency, result.Buy);
             if (result.Take)
             {
-                await _tradingActionService.AddTradingAction(result.Buy, result.Currency.ToString(), balance, "TakeProfit");
+                if(_dbConfig.UseDb)
+                    await _tradingActionService.AddTradingAction(result.Buy, result.Currency.ToString(), balance, "TakeProfit");
                 await _telegramBot.SendTakeProfit(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
             else
             {
-                await _tradingActionService.AddTradingAction(result.Buy, result.Currency.ToString(), balance, "StopLoss");
+                if (_dbConfig.UseDb)
+                    await _tradingActionService.AddTradingAction(result.Buy, result.Currency.ToString(), balance, "StopLoss");
                 await _telegramBot.SendStopLoss(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
         }
@@ -128,7 +132,8 @@ namespace TradingBot.Services
 
                         // Get the current balance and add a trading action to the history
                         decimal balance = await _brokerService.GetUsdtFuturesBalance();
-                        await _tradingActionService.AddTradingAction(false, action.Currency.ToString(), balance, "Cancel");
+                        if (_dbConfig.UseDb)
+                            await _tradingActionService.AddTradingAction(false, action.Currency.ToString(), balance, "Cancel");
 
                         // Notify that the action has finished and send a Telegram message
                         _brokerService.NotifyFinished(action.Currency, false);
@@ -187,7 +192,8 @@ namespace TradingBot.Services
 
                         // Get current balance and add trading action
                         decimal balance = await _brokerService.GetUsdtFuturesBalance();
-                        await _tradingActionService.AddTradingAction(true, action.Currency.ToString(), balance, "Cancel");
+                        if (_dbConfig.UseDb)
+                            await _tradingActionService.AddTradingAction(true, action.Currency.ToString(), balance, "Cancel");
 
                         // Notify that the action has finished and send a message to Telegram
                         _brokerService.NotifyFinished(action.Currency, true);
@@ -244,6 +250,10 @@ namespace TradingBot.Services
         {
             _logger.LogInformation("WELLSAIK ALERTS");
             await ServiceExtensions.SyncTime(_logger);
+
+            if (_dbConfig.UseDb)
+                await _tradingActionService.EnsureCreatedDB();
+
             Console.WriteLine("Pips: ");
             foreach (var pip in _botConfig.Pips)
             {
@@ -254,6 +264,11 @@ namespace TradingBot.Services
             Task webhookListeningTask = _webhookService.StartListeningAsync();
             Task telegramBotTask = _telegramBot.Start();
             await _brokerService.ConnectToStream();
+            var res = await _brokerService.GetCandles(CryptoCurrency.BTCUSDT, Bybit.Net.Enums.KlineInterval.FiveMinutes, 20, DateTime.Now, DateTime.Now.AddDays(-1));
+            foreach (var kline in res)
+            {
+                Console.WriteLine($"Open time: {kline.OpenTime}, Open price: {kline.OpenPrice}, High price: {kline.HighPrice}, Low price: {kline.LowPrice}, Close price: {kline.ClosePrice}, Volume: {kline.Volume}");
+            }
             await Task.Delay(-1);
         }
 

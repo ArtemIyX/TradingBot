@@ -13,22 +13,17 @@ namespace TradingBot.Data.Config
         {
 
         }
-        public BotConfig(string? webhookUrl, string? secretKey, bool cancel, List<BinancePip>? pips, bool reverse, bool takeProfitPips, bool stopLossPips)
-        {
-            WebhookUrl = webhookUrl;
-            SecretKey = secretKey;
-            Cancel = cancel;
-            Pips = pips;
-            Reverse = reverse;
-            TakeProfitPips = takeProfitPips;
-            StopLossPips = stopLossPips;
-        }
+
 
         public string? WebhookUrl { get; set; }
         public string? SecretKey { get; set; }
-        public bool Cancel { get; set; }
+        
         public List<BinancePip>? Pips { get; set; }
 
+        public int RecentLen { get; set; }
+        public string RecentTF { get; set; }
+
+        public bool Cancel { get; set; }
         public bool Reverse { get; set; }
         public bool TakeProfitPips { get; set; }
         public bool StopLossPips { get; set; }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Bybit.Net.Enums;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -45,5 +46,70 @@ public static class ServiceExtensions
         Process.Start("sudo", $"date -s \"{serverTime.ToString("yyyy-MM-dd HH:mm:ss")}\"").WaitForExit();
         logger.LogInformation("New time is: " + serverTime);
 
+    }
+
+    public static KlineInterval ParseKlineInterval(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+        {
+            throw new ArgumentException("Input cannot be null or empty.", nameof(input));
+        }
+
+        input = input.ToLower();
+
+        if (input.EndsWith("m"))
+        {
+            if (int.TryParse(input.Substring(0, input.Length - 1), out int minutes))
+            {
+                switch (minutes)
+                {
+                    case 1:
+                        return KlineInterval.OneMinute;
+                    case 3:
+                        return KlineInterval.ThreeMinutes;
+                    case 5:
+                        return KlineInterval.FiveMinutes;
+                    case 15:
+                        return KlineInterval.FifteenMinutes;
+                    case 30:
+                        return KlineInterval.ThirtyMinutes;
+                    default:
+                        throw new ArgumentException($"Invalid interval: {input}", nameof(input));
+                }
+            }
+            else
+            {
+                throw new ArgumentException($"Invalid interval: {input}", nameof(input));
+            }
+        }
+        else if (input.EndsWith("h"))
+        {
+            if (int.TryParse(input.Substring(0, input.Length - 1), out int hours))
+            {
+                switch (hours)
+                {
+                    case 1:
+                        return KlineInterval.OneHour;
+                    case 2:
+                        return KlineInterval.TwoHours;
+                    case 4:
+                        return KlineInterval.FourHours;
+                    case 6:
+                        return KlineInterval.SixHours;
+                    case 12:
+                        return KlineInterval.TwelveHours;
+                    default:
+                        throw new ArgumentException($"Invalid interval: {input}", nameof(input));
+                }
+            }
+            else
+            {
+                throw new ArgumentException($"Invalid interval: {input}", nameof(input));
+            }
+        }
+        else
+        {
+            throw new ArgumentException($"Invalid interval: {input}", nameof(input));
+        }
     }
 }
