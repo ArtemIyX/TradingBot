@@ -255,7 +255,7 @@ namespace TradingBot.Services
                 await _tradingActionService.EnsureCreatedDB();
 
             Console.WriteLine("Pips: ");
-            foreach (var pip in _botConfig.Pips)
+            foreach (BinancePip pip in _botConfig.Pips)
             {
                 Console.WriteLine($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.Tp}\tSL: {pip.Sl}]");
             }
@@ -263,12 +263,7 @@ namespace TradingBot.Services
             // ReSharper disable once UnusedVariable
             Task webhookListeningTask = _webhookService.StartListeningAsync();
             Task telegramBotTask = _telegramBot.Start();
-            await _brokerService.ConnectToStream();
-            var res = await _brokerService.GetCandles(CryptoCurrency.BTCUSDT, Bybit.Net.Enums.KlineInterval.FiveMinutes, 20, DateTime.Now, DateTime.Now.AddDays(-1));
-            foreach (var kline in res)
-            {
-                Console.WriteLine($"Open time: {kline.OpenTime}, Open price: {kline.OpenPrice}, High price: {kline.HighPrice}, Low price: {kline.LowPrice}, Close price: {kline.ClosePrice}, Volume: {kline.Volume}");
-            }
+            Task connectToStream = _brokerService.ConnectToStream();
             await Task.Delay(-1);
         }
 

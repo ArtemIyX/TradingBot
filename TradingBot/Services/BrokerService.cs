@@ -340,9 +340,15 @@ internal class BrokerService
         }
     }
 
-    public async Task<IEnumerable<BybitKline>> GetCandles(CryptoCurrency currency, KlineInterval interval, int limit, DateTime From, DateTime To)
+    public async Task<IEnumerable<BybitKline>> GetCandles(CryptoCurrency currency, string interval, DateTime from, DateTime to)
     {
-        var res = await _bybitClient.DerivativesApi.ExchangeData.GetKlinesAsync(Category.Linear, currency.ToString(), interval, From, To, limit);
+        KlineInterval byBitInterval = ServiceExtensions.ParseKlineInterval(interval);
+        return await GetCandles(currency, interval, from, to);
+    }
+
+    public async Task<IEnumerable<BybitKline>> GetCandles(CryptoCurrency currency, KlineInterval interval, DateTime from, DateTime to)
+    {
+        var res = await _bybitClient.DerivativesApi.ExchangeData.GetKlinesAsync(Category.Inverse, currency.ToString(), interval, From, To);
         if(!res.Success)
         {
             throw new Exception("Can not get klines: " + res.Error?.Message);
