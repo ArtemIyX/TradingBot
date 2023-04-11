@@ -11,11 +11,11 @@ namespace TradingBot.Services
     {
         public bool Buy { get; set; }
         public CryptoCurrency Currency { get; set; }
-        public decimal Take { get; set; }
     }
 
     public class StrategyAdvancedAction : StrategyAction
     {
+        public decimal Take { get; set; }
         public decimal Loss { get; set; }
         public decimal PipSize { get; set; }
     }
@@ -95,22 +95,11 @@ namespace TradingBot.Services
                 {
                     bool buy = request.Action == "BUY";
                     _exucuting = true;
-                    // Pip tp/sl
 
-                    BinancePip? needPip = _botConfig.Pips.Find(x => x.Currency == request.Currency.ToString());
-                    // if we dont have pip
-                    if (needPip == null)
-                    {
-                        throw new Exception($"Pip profit enabled, but can not find {currency} in settings");
-                    }
-
-                    OnAction?.Invoke(this, new StrategyAdvancedAction()
+                    OnAction?.Invoke(this, new StrategyAction()
                     {
                         Buy = buy,
                         Currency = currency,
-                        Take = needPip.Tp,
-                        Loss = needPip.Sl,
-                        PipSize = needPip.PipSize
                     });
                 }
                 else

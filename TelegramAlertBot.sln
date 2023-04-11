@@ -10,7 +10,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot", "TradingBot\Tr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinuxTimeChanger", "LinuxTimeChanger\LinuxTimeChanger.csproj", "{C9ED888E-898B-49C5-8DE7-E892B7CEB1AF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingDataBaseLib", "TradingDataBaseLib\TradingDataBaseLib.csproj", "{A7F2510B-115E-44F5-B294-EAB5B4CB2BB6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingDataBaseLib", "TradingDataBaseLib\TradingDataBaseLib.csproj", "{A7F2510B-115E-44F5-B294-EAB5B4CB2BB6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataBaseTest", "DataBaseTest\DataBaseTest.csproj", "{3FCC26CB-99F6-4900-A544-0AAD7698A6D4}"
 	ProjectSection(ProjectDependencies) = postProject

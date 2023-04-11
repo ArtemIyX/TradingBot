@@ -1,6 +1,8 @@
 ﻿using Bybit.Net.Enums;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Org.BouncyCastle.Crypto.Tls;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using TradingBot.Data;
@@ -46,6 +48,33 @@ public static class ServiceExtensions
         Process.Start("sudo", $"date -s \"{serverTime.ToString("yyyy-MM-dd HH:mm:ss")}\"").WaitForExit();
         logger.LogInformation("New time is: " + serverTime);
 
+    }
+
+    private static int DigitsAfterDecimal(string input) => input.Contains(".") ? input.Length - 1 - input.IndexOf('.') : 0;
+
+    public static int PriceRoundingAccuracy(InstrumentInfoResult instrumentInfo)
+    {
+        string numberString = instrumentInfo.List.First().PriceFilter.TickSize;
+        return DigitsAfterDecimal(numberString);
+    }
+
+    public static int QtyRoundingAccuaracy(InstrumentInfoResult instrumentInfo)
+    {
+        string numberString = instrumentInfo.List.First().LotSizeFilter.QtyStep;
+        return DigitsAfterDecimal(numberString);
+    }
+
+    public static async Task<InstrumentInfoResult?> GetInstrumentInfo(CryptoCurrency currency)
+    {
+        using (var client = new HttpClient())
+        {
+            string url = $"https://api.bybit.com/derivatives/v3/public/instruments-info?symbol={currency.ToString()}";
+            HttpResponseMessage response = await client.GetAsync(url);
+            //response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            JObject jObject = JObject.Parse(json);
+            return jObject.GetValue("result").ToObject<InstrumentInfoResult>();
+        }
     }
 
     public static KlineInterval ParseKlineInterval(string input)
