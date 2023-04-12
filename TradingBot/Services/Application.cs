@@ -96,34 +96,7 @@ namespace TradingBot.Services
                      _brokerService.CurrentCurrency == currency &&
                      _botConfig.Cancel)
             {
-                // Close the SELL position by market price
-                _logger.LogInformation("Cancel: Close SELL position by market price");
-                _monitorSource.Cancel();
-                await _brokerService.ClosePosition();
-
-                // Get the current balance and add a trading action to the history
-                decimal balance = await _brokerService.GetUsdtFuturesBalance();
-                if (_dbConfig.UseDb)
-                    await _tradingActionService.AddTradingAction(false, currency.ToString(), balance, "Cancel");
-
-                // Notify that the action has finished and send a Telegram message
-                decimal entered = _brokerService.Enter;
-                TimeSpan timeTaken = DateTime.Now - _brokerService.OrderStarted;
-                _brokerService.NotifyFinished(currency, false);
-                decimal currentPrice = await _brokerService.GetAvgPrice(currency);
-                await _telegramBot.SendCancel(false, currency, timeTaken, entered, currentPrice);
-                
-                if (_botConfig.Reverse)
-                {
-                    _logger.LogInformation("Trend reverse: Open BUY position");
-
-                    await TradingView_OnAction(_tradingViewService, new StrategyAdvancedAction()
-                    {
-                        Buy = true,
-                        Currency = currency,
-                    });
-                }
-                return;
+                await CloseCurrentPosition(currency);
             }
             // Check if the bot does not have any position and request a BUY position
             else if (!_brokerService.HasPosition)
@@ -144,6 +117,42 @@ namespace TradingBot.Services
             }
         }
 
+        private async Task CloseCurrentPosition(CryptoCurrency currency)
+        {
+            bool currentPosition = _brokerService.Buy;
+            string position = currentPosition ? "BUY" : "SELL";
+            // Close the BUY position by market price
+            _logger.LogInformation($"Cancel: Close {position} position by market price");
+            _monitorSource.Cancel();
+            await _brokerService.ClosePosition();
+
+            // Get current balance and add trading action
+            decimal balance = await _brokerService.GetUsdtFuturesBalance();
+            if (_dbConfig.UseDb)
+                await _tradingActionService.AddTradingAction(true, currency.ToString(), balance, "Cancel");
+
+            // Notify that the action has finished and send a message to Telegram
+            decimal entered = _brokerService.Enter;
+            TimeSpan timeTaken = DateTime.Now - _brokerService.OrderStarted;
+            _brokerService.NotifyFinished(currency, true);
+            decimal currentPrice = await _brokerService.GetAvgPrice(currency);
+            await _telegramBot.SendCancel(true, currency, timeTaken, entered, currentPrice);
+
+            // Check if the advanced action is null, throw an exception if it is;
+
+            // Open a SELL position
+            if (_botConfig.Reverse)
+            {
+                _logger.LogInformation("Trend reverse: Open SELL position");
+                await TradingView_OnAction(_tradingViewService, new StrategyAction()
+                {
+                    Buy = !currentPosition,
+                    Currency = currency,
+                });
+            }
+            return;
+        }
+
         private async Task ProcessSellAction(CryptoCurrency currency)
         {
             // Check if bot has a SELL position with the same currency
@@ -157,36 +166,7 @@ namespace TradingBot.Services
                 && _brokerService.CurrentCurrency == currency
                 && _botConfig.Cancel)
             {
-                // Close the BUY position by market price
-                _logger.LogInformation("Trend reverse: Close BUY position by market price");
-                _monitorSource.Cancel();
-                await _brokerService.ClosePosition();
-
-                // Get current balance and add trading action
-                decimal balance = await _brokerService.GetUsdtFuturesBalance();
-                if (_dbConfig.UseDb)
-                    await _tradingActionService.AddTradingAction(true, currency.ToString(), balance, "Cancel");
-
-                // Notify that the action has finished and send a message to Telegram
-                decimal entered = _brokerService.Enter;
-                TimeSpan timeTaken = DateTime.Now - _brokerService.OrderStarted;
-                _brokerService.NotifyFinished(currency, true);
-                decimal currentPrice = await _brokerService.GetAvgPrice(currency);
-                await _telegramBot.SendCancel(true, currency, timeTaken, entered, currentPrice);
-
-                // Check if the advanced action is null, throw an exception if it is;
-
-                // Open a SELL position
-                if (_botConfig.Reverse)
-                {
-                    _logger.LogInformation("Trend reverse: Open SELL position");
-                    await TradingView_OnAction(_tradingViewService, new StrategyAction()
-                    {
-                        Buy = false,
-                        Currency = currency,
-                    });
-                }
-                return;
+                await CloseCurrentPosition(currency);
             }
             // Check if bot doesn't have any position
             else if (!_brokerService.HasPosition)
@@ -225,9 +205,19 @@ namespace TradingBot.Services
             _tradingViewService.NotifyFinish();
         }
 
-        private async Task TradingView_OnStop(object? sender, StrategyStop stop)
+        private async Task TradingView_OnStop(object? sender, StrategyAction stop)
         {
             _logger.LogInformation($"Trading view stop");
+            if(stop.Buy && _brokerService.HasPosition && _brokerService.Buy && _botConfig.Cancel)
+            {
+                _logger.LogInformation("Canceling buy position..");
+                await CloseCurrentPosition(stop.Currency);
+            }
+            else if(!stop.Buy && _brokerService.HasPosition && !_brokerService.Buy && _botConfig.Cancel)
+            {
+                _logger.LogInformation("Canceling sell position..");
+                await CloseCurrentPosition(stop.Currency);
+            }
             _tradingViewService.NotifyFinish();
             return;
         }

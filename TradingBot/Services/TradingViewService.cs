@@ -20,15 +20,10 @@ namespace TradingBot.Services
         public decimal PipSize { get; set; }
     }
 
-    public struct StrategyStop
-    {
-        public bool Buy { get; set; }
-        public CryptoCurrency Currency { get; set; }
-    }
 
     public delegate Task StrategyActionDelegate(object? sender, StrategyAction action);
 
-    public delegate Task StrategyStopDelegate(object? sender, StrategyStop stop);
+    public delegate Task StrategyStopDelegate(object? sender, StrategyAction stop);
 
     internal class TradingViewService
     {
@@ -97,6 +92,17 @@ namespace TradingBot.Services
                     _exucuting = true;
 
                     OnAction?.Invoke(this, new StrategyAction()
+                    {
+                        Buy = buy,
+                        Currency = currency,
+                    });
+                }
+                else if(request.Action == "BUY_CANCEL" || request.Action == "SELL_CANCEL")
+                {
+                    bool buy = request.Action == "BUY_CANCEL";
+                    _exucuting = true;
+
+                    OnStop?.Invoke(this, new StrategyAction()
                     {
                         Buy = buy,
                         Currency = currency,
