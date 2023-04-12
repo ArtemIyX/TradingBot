@@ -378,8 +378,11 @@ internal class BrokerService
         }
         else
         {
+            
             KlineInterval interval = ServiceExtensions.ParseKlineInterval(_botConfig.RecentTF);
-            DateTime startTime = DateTime.UtcNow - TimeSpan.FromMinutes((int)interval * (_botConfig.RecentLen + 1));
+            int seconds = (int)interval;
+            int minutes = seconds / 60;
+            DateTime startTime = DateTime.UtcNow - TimeSpan.FromMinutes(minutes * _botConfig.RecentLen);
             DateTime endTime = DateTime.UtcNow; // Replace with the desired end time
             IEnumerable<BybitKline> candles = await GetCandles(currency, _botConfig.RecentTF, startTime, endTime);
             switch (side)
