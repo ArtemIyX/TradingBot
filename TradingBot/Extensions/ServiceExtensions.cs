@@ -43,10 +43,20 @@ public static class ServiceExtensions
         DateTime serverTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                 .AddSeconds(serverTimeUnix)
                 .ToLocalTime();
+        DateTime timeNow = DateTime.Now;
 
-        // Run the shell command to set the system time
-        Process.Start("sudo", $"date -s \"{serverTime.ToString("yyyy-MM-dd HH:mm:ss")}\"").WaitForExit();
-        logger.LogInformation("New time is: " + serverTime);
+        TimeSpan difference = (serverTime > timeNow) ? serverTime - timeNow : serverTime - timeNow;
+        if (Math.Abs(difference.TotalSeconds) > 2)
+        {
+            // Run the shell command to set the system time
+            Process.Start("sudo", $"date -s \"{serverTime.ToString("yyyy-MM-dd HH:mm:ss")}\"").WaitForExit();
+            logger.LogInformation("New time is: " + serverTime);
+        }
+        else
+        {
+            logger.LogInformation($"Dont need to sync time. \nServer time: {serverTime}\nCurrent time: {timeNow}");
+        }
+          
 
     }
 

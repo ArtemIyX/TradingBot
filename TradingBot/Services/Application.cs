@@ -228,13 +228,6 @@ namespace TradingBot.Services
             _logger.LogInformation("WELLSAIK ALERTS");
             await ServiceExtensions.SyncTime(_logger);
 
-            DateTime startTime = DateTime.UtcNow - TimeSpan.FromMinutes(15 * 10);
-            DateTime endTime = DateTime.UtcNow; // Replace with the desired end time
-            var candles = await _brokerService.GetCandles(CryptoCurrency.FLMUSDT, Bybit.Net.Enums.KlineInterval.FiveMinutes, startTime, endTime);
-
-            candles.ToList().ForEach(x => _logger.LogInformation(x.HighPrice.ToString()));
-            _logger.LogWarning(_brokerService.GetRecentHigh(candles).HighPrice.ToString());
-
             if (_dbConfig.UseDb)
                 await _tradingActionService.EnsureCreatedDB();
 
