@@ -104,9 +104,9 @@ namespace TradingBot.Services
             {
                 _logger.LogInformation("Bot is free, reqeusting BUY position");
                 decimal currentPrice = await _brokerService.GetAvgPrice(currency);
-                decimal? tp = await _brokerService.CalculateTakeProfit(Bybit.Net.Enums.OrderSide.Buy, currency, currentPrice);
-                decimal? sl = await _brokerService.CalculateStopLoss(Bybit.Net.Enums.OrderSide.Buy, currency, currentPrice);
-                await _brokerService.RequestBuy(currency, tp, sl);
+                decimal sl = await _brokerService.CalculateStopLoss(Bybit.Net.Enums.OrderSide.Buy, currency);
+                decimal? tp = _brokerService.CalculateTakeProfit(Bybit.Net.Enums.OrderSide.Buy, currentPrice, sl);
+                await _brokerService.RequestBuy(currency, sl, tp);
                 await _telegramBot.SendLong(currency, currentPrice, tp, sl);
             }
             // Check if the bot already has a position and log a warning message
@@ -142,7 +142,7 @@ namespace TradingBot.Services
             // Check if the advanced action is null, throw an exception if it is;
 
             // Open a SELL position
-            if (_botConfig.Reverse)
+            /*if (_botConfig.Reverse)
             {
                 _logger.LogInformation("Trend reverse: Open SELL position");
                 await TradingView_OnAction(_tradingViewService, new StrategyAction()
@@ -150,7 +150,7 @@ namespace TradingBot.Services
                     Buy = !currentPosition,
                     Currency = currency,
                 });
-            }
+            }*/
             return;
         }
 
@@ -174,10 +174,9 @@ namespace TradingBot.Services
             {
                 _logger.LogInformation("Bot is free, requesting SELL position");
                 decimal currentPrice = await _brokerService.GetAvgPrice(currency);
-                decimal? tp = await _brokerService.CalculateTakeProfit(Bybit.Net.Enums.OrderSide.Sell, currency, currentPrice);
-                decimal? sl = await _brokerService.CalculateStopLoss(Bybit.Net.Enums.OrderSide.Sell, currency, currentPrice);
-                await _brokerService.RequestSell(currency, tp, sl);
-
+                decimal sl = await _brokerService.CalculateStopLoss(Bybit.Net.Enums.OrderSide.Sell, currency);
+                decimal? tp = _brokerService.CalculateTakeProfit(Bybit.Net.Enums.OrderSide.Sell, currentPrice, sl);
+                await _brokerService.RequestSell(currency, sl, tp);
                 // Send a message to Telegram
                 await _telegramBot.SendShort(currency, currentPrice, tp, sl);
             }
@@ -223,6 +222,7 @@ namespace TradingBot.Services
             return;
         }
 
+        // ReSharper disable UnusedVariable
         public async Task Start()
         {
             _logger.LogInformation("WELLSAIK ALERTS");
@@ -230,14 +230,8 @@ namespace TradingBot.Services
 
             if (_dbConfig.UseDb)
                 await _tradingActionService.EnsureCreatedDB();
-
-            Console.WriteLine("Pips: ");
-            foreach (BinancePip pip in _botConfig.Pips)
-            {
-                Console.WriteLine($"Pip:[{pip.Currency}\tPipSize: {pip.PipSize}\tTP: {pip.Tp}\tSL: {pip.Sl}]");
-            }
+            
             _webhookService.WebhookReceived += WebhookReceived;
-            // ReSharper disable once UnusedVariable
             Task webhookListeningTask = _webhookService.StartListeningAsync();
             Task telegramBotTask = _telegramBot.Start();
             Task connectToStream = _brokerService.ConnectToStream();

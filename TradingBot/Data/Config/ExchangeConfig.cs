@@ -12,7 +12,10 @@ namespace TradingBot.Data.Config
         public string ApiKey { get; set; }
         public string SecretKey { get; set; }
 
+        public bool Fixed { get; set; }
         public decimal OrderSizePercent { get; set; }
+        
+        public decimal Risk { get; set; }
         public int Leverage { get; set; }
     }
 

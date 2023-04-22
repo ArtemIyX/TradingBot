@@ -1,5 +1,4 @@
-﻿
-using Bybit.Net.Clients;
+﻿using Bybit.Net.Clients;
 using Bybit.Net.Enums;
 using Bybit.Net.Objects;
 using Bybit.Net.Objects.Models;
@@ -63,12 +62,10 @@ internal class BrokerService
         {
             ApiCredentials = credits
         });
-
     }
 
     public async Task ConnectToStream()
     {
-
         await _bybitSocketClient.UsdPerpetualStreams.SubscribeToOrderUpdatesAsync(OnOrderUpdate);
         _logger.LogInformation("Connected to ByBit stream api");
     }
@@ -80,6 +77,7 @@ internal class BrokerService
             _logger.LogWarning("Bot dont have position to close");
             return;
         }
+
         bool sellPos = side == OrderSide.Sell && !Buy;
         bool buyPos = side == OrderSide.Buy && Buy;
         bool correctPos = sellPos || buyPos;
@@ -89,6 +87,7 @@ internal class BrokerService
             _logger.LogWarning($"Uncorrect position ({side}, when we have {sidestr})");
             return;
         }
+
         TpSlReached?.Invoke(new MonitorResult()
         {
             Price = price,
@@ -96,7 +95,6 @@ internal class BrokerService
             Take = tp,
             Currency = CurrentCurrency
         });
-
     }
 
     private void OnOrderUpdate(DataEvent<IEnumerable<BybitUsdPerpetualOrderUpdate>> dataUpdate)
@@ -112,7 +110,6 @@ internal class BrokerService
         OrderSide invertSide = update.Side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
         switch (updateType)
         {
-            
             case "CreateByTakeProfit":
                 _logger.LogInformation($"Stream: {info} was closed by take profit");
                 TryNotify(invertSide, true, update.LastTradePrice);
@@ -123,10 +120,11 @@ internal class BrokerService
                 break;
             case "CreateByClosing":
                 _logger.LogInformation($"Stream: {info} was closed");
-                if(cur == CurrentCurrency)
+                if (cur == CurrentCurrency)
                 {
                     NotifyFinished(cur, update.Side == OrderSide.Buy);
                 }
+
                 break;
             default:
                 _logger.LogInformation($"Stream: {info} was {update.CreateType}");
@@ -314,12 +312,12 @@ internal class BrokerService
         }
     }
 
-    public async Task RequestBuy(CryptoCurrency currency, decimal? takeProfit = null, decimal? stopLoss = null)
+    public async Task RequestBuy(CryptoCurrency currency, decimal stopLoss, decimal? takeProfit = null)
     {
         _logger.LogInformation($"Requested BUY ({currency.ToString()})");
         try
         {
-            await RequestOrder(true, currency, takeProfit, stopLoss);
+            await RequestOrder(true, currency, stopLoss, takeProfit);
         }
         catch (Exception ex)
         {
@@ -327,12 +325,12 @@ internal class BrokerService
         }
     }
 
-    public async Task RequestSell(CryptoCurrency currency, decimal? takeProfit = null, decimal? stopLoss = null)
+    public async Task RequestSell(CryptoCurrency currency, decimal stopLoss, decimal? takeProfit = null)
     {
         _logger.LogInformation($"Requested SELL ({currency.ToString()})");
         try
         {
-            await RequestOrder(false, currency, takeProfit, stopLoss);
+            await RequestOrder(false, currency, stopLoss, takeProfit);
         }
         catch (Exception ex)
         {
@@ -340,117 +338,123 @@ internal class BrokerService
         }
     }
 
-    public async Task<decimal?> CalculateTakeProfit(OrderSide side, CryptoCurrency currency, decimal avgPrice)
+    public decimal? CalculateTakeProfit(OrderSide side, decimal avgPrice, decimal stopLoss)
     {
-        if(_botConfig.TakeProfitPips)
-        {
-            BinancePip needPip = _botConfig.Pips.Find(x => x.Currency == currency.ToString()) ?? throw new Exception($"Can not find pip for '{currency.ToString()}'");
-            switch (side)
-            {
-                case OrderSide.Buy:
-                    return avgPrice + (needPip.Tp * needPip.PipSize);
-                case OrderSide.Sell:
-                    return avgPrice - (needPip.Tp * needPip.PipSize);
-                default:
-                    return null;
-            }
-        }
-        else
+        if (!_botConfig.PutTakeProfit)
         {
             return null;
         }
-    }
 
-    public async Task<decimal?> CalculateStopLoss(OrderSide side, CryptoCurrency currency, decimal avgPrice)
-    {
-        if (_botConfig.StopLossPips)
+        if (side == OrderSide.Buy)
         {
-            BinancePip needPip = _botConfig.Pips.Find(x => x.Currency == currency.ToString()) ?? throw new Exception($"Can not find pip for '{currency.ToString()}'");
-            switch (side)
-            {
-                case OrderSide.Buy:
-                    return avgPrice - (needPip.Sl * needPip.PipSize);
-                case OrderSide.Sell:
-                    return avgPrice + (needPip.Sl * needPip.PipSize);
-                default:
-                    return null;
-            }
+            decimal buyStopLossAmount = avgPrice - stopLoss;
+            decimal buyTakeProfitAmount = buyStopLossAmount * _botConfig.TakeProfitRatio;
+            decimal buyTakeProfitPrice = avgPrice + buyTakeProfitAmount;
+            return buyTakeProfitPrice;
         }
         else
         {
-            
-            KlineInterval interval = ServiceExtensions.ParseKlineInterval(_botConfig.RecentTF);
-            int seconds = (int)interval;
-            int minutes = seconds / 60;
-            DateTime startTime = DateTime.UtcNow - TimeSpan.FromMinutes(minutes * _botConfig.RecentLen);
-            DateTime endTime = DateTime.UtcNow; // Replace with the desired end time
-            IEnumerable<BybitKline> candles = await GetCandles(currency, _botConfig.RecentTF, startTime, endTime);
-            switch (side)
-            {
-                case OrderSide.Buy:
-                    return GetRecentLow(candles).LowPrice;
-                case OrderSide.Sell:
-                    return GetRecentHigh(candles).HighPrice;
-                default:
-                    return null;
-            }
+            decimal sellStopLossAmount = stopLoss - avgPrice; 
+            decimal sellTakeProfitAmount = sellStopLossAmount * _botConfig.TakeProfitRatio;
+            decimal sellTakeProfitPrice = avgPrice - sellTakeProfitAmount;
+            return sellTakeProfitPrice;
         }
     }
 
-    public async Task<IEnumerable<BybitKline>> GetCandles(CryptoCurrency currency, string interval, DateTime from, DateTime to)
+    public async Task<decimal> CalculateStopLoss(OrderSide side, CryptoCurrency currency)
+    {
+        KlineInterval interval = ServiceExtensions.ParseKlineInterval(_botConfig.RecentTF);
+        int seconds = (int)interval;
+        int minutes = seconds / 60;
+        DateTime startTime = DateTime.UtcNow - TimeSpan.FromMinutes(minutes * _botConfig.RecentLen);
+        DateTime endTime = DateTime.UtcNow; // Replace with the desired end time
+        IEnumerable<BybitKline> candles = await GetCandles(currency, _botConfig.RecentTF, startTime, endTime);
+
+        return side == OrderSide.Buy
+            ? (decimal)GetRecentLow(candles)?.LowPrice
+            : (decimal)GetRecentHigh(candles)?.HighPrice;
+    }
+
+    public async Task<IEnumerable<BybitKline>> GetCandles(CryptoCurrency currency, string interval, DateTime from,
+        DateTime to)
     {
         KlineInterval byBitInterval = ServiceExtensions.ParseKlineInterval(interval);
         return await GetCandles(currency, byBitInterval, from, to);
     }
 
-    public async Task<IEnumerable<BybitKline>> GetCandles(CryptoCurrency currency, KlineInterval interval, DateTime from, DateTime to)
+    public async Task<IEnumerable<BybitKline>> GetCandles(CryptoCurrency currency, KlineInterval interval,
+        DateTime from, DateTime to)
     {
-        var res = await _bybitClient.DerivativesApi.ExchangeData.GetKlinesAsync(Category.Inverse, currency.ToString(), interval, from, to);
-        if(!res.Success)
+        var res = await _bybitClient.DerivativesApi.ExchangeData.GetKlinesAsync(Category.Inverse, currency.ToString(),
+            interval, from, to);
+        if (!res.Success)
         {
             throw new Exception("Can not get klines: " + res.Error?.Message);
         }
+
         return res.Data;
     }
 
     public BybitKline? GetRecentHigh(IEnumerable<BybitKline> klines) => klines.MaxBy(x => x.HighPrice);
     public BybitKline? GetRecentLow(IEnumerable<BybitKline> klines) => klines.MinBy(x => x.LowPrice);
-    
 
-    private async Task RequestByBitOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency, decimal cost,
+
+    private async Task<PlaceOrderResult> PlaceFloatingOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency,
+        decimal cost, decimal risk,
+        int qtyPrecision, int pricePrecision,
+        decimal stopLoss)
+    {
+        stopLoss = Math.Round((decimal)stopLoss, pricePrecision);
+        decimal stopLossDiffPercent = Math.Abs((cost - stopLoss) / stopLoss * 100);
+        decimal qty = Math.Round(risk / (stopLossDiffPercent * 100), qtyPrecision);
+        string slInfo = stopLoss.ToString(CultureInfo.InvariantCulture);
+        
+        _logger.LogInformation(
+            $"FLOATING Trade: {side}, QTY:{qty}$, {currency}. Enter: {cost}, TP: NA, SL: {slInfo}");
+        
+        _logger.LogWarning($"Placing trade on bybit...");
+        // Place market order using ByBit API
+        WebCallResult<Bybit.Net.Objects.Models.BybitUsdPerpetualOrder> openPositionRes =
+            await _bybitClient.UsdPerpetualApi.Trading.PlaceOrderAsync(
+                symbol: currency.ToString().ToUpper(),
+                side: side,
+                type: Bybit.Net.Enums.OrderType.Market,
+                quantity: qty,
+                timeInForce: Bybit.Net.Enums.TimeInForce.GoodTillCanceled,
+                reduceOnly: false,
+                closeOnTrigger: false,
+                positionMode: PositionMode.OneWay,
+                takeProfitPrice: null,
+                stopLossPrice: stopLoss);
+        return new PlaceOrderResult()
+        {
+            WebCallResult = openPositionRes,
+            Qty = qty
+        };
+    }
+    
+    private async Task<PlaceOrderResult> PlaceFixedOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency, 
+        decimal cost, decimal balance, decimal leverage,
+        int qtyPrecision, int pricePrecision,
         decimal? takeProfit, decimal? stopLoss)
     {
-        await ServiceExtensions.SyncTime(_logger);
-
-        _logger.LogWarning($"Interacting with finances, as the status is ON");
-        await _bybitClient.UsdPerpetualApi.Account.SetLeverageAsync(currency.ToString(),
-            buyLeverage: _exchangeServiceConfig.Leverage, sellLeverage: _exchangeServiceConfig.Leverage);
-        _logger.LogInformation($"'{currency}' Set Leverage to {_exchangeServiceConfig.Leverage}x");
-
-        // Retrieve bot's current balance and calculate trade amount
-        decimal balance = await GetUsdtFuturesBalance();
         decimal percent = _exchangeServiceConfig.OrderSizePercent;
-        decimal leverage = _exchangeServiceConfig.Leverage;
-        InstrumentInfoResult? instrument = await ServiceExtensions.GetInstrumentInfo(currency);
-        int qtyPrecision = ServiceExtensions.QtyRoundingAccuaracy(instrument);
-        int pricePrecision = ServiceExtensions.PriceRoundingAccuracy(instrument);
-
         decimal qty = Math.Round((((balance * percent) * leverage) / cost), qtyPrecision);
 
         string? tpInfo = takeProfit == null ? "NA" : takeProfit.ToString();
         string? slInfo = stopLoss == null ? "NA" : stopLoss.ToString();
         // Log trade details
         _logger.LogInformation(
-            $"Trade: {side} {qty} {currency}: {cost}, TP: {tpInfo}, SL: {slInfo}");
+            $"FIXED Trade: {side}, QTY:{qty}$, {currency}. Enter: {cost}, TP: {tpInfo}, SL: {slInfo}");
 
         // Round take profit and stop loss prices to 2 decimal places
         if (takeProfit != null)
             takeProfit = Math.Round((decimal)takeProfit, pricePrecision);
-        if(stopLoss != null)
+        if (stopLoss != null)
             stopLoss = Math.Round((decimal)stopLoss, pricePrecision);
 
         _logger.LogWarning($"Placing trade on bybit...");
-        // Place market order using Binance API
+        // Place market order using ByBit API
         WebCallResult<Bybit.Net.Objects.Models.BybitUsdPerpetualOrder> openPositionRes =
             await _bybitClient.UsdPerpetualApi.Trading.PlaceOrderAsync(
                 symbol: currency.ToString().ToUpper(),
@@ -463,20 +467,55 @@ internal class BrokerService
                 positionMode: PositionMode.OneWay,
                 takeProfitPrice: takeProfit,
                 stopLossPrice: stopLoss);
+        return new PlaceOrderResult()
+        {
+            WebCallResult = openPositionRes,
+            Qty = qty
+        };
+    }
+
+    private async Task RequestByBitOrder(Bybit.Net.Enums.OrderSide side, CryptoCurrency currency, decimal cost,
+        decimal stopLoss, decimal? takeProfit = null)
+    {
+        await ServiceExtensions.SyncTime(_logger);
+
+        _logger.LogWarning($"Interacting with finances, as the status is ON");
+        await _bybitClient.UsdPerpetualApi.Account.SetLeverageAsync(currency.ToString(),
+            buyLeverage: _exchangeServiceConfig.Leverage, sellLeverage: _exchangeServiceConfig.Leverage);
+        _logger.LogInformation($"'{currency}' Set Leverage to {_exchangeServiceConfig.Leverage}x");
+
+        // Retrieve bot's current balance and calculate trade amount
+        decimal balance = await GetUsdtFuturesBalance();
+        decimal leverage = _exchangeServiceConfig.Leverage;
+        InstrumentInfoResult? instrument = await ServiceExtensions.GetInstrumentInfo(currency);
+        int qtyPrecision = ServiceExtensions.QtyRoundingAccuaracy(instrument);
+        int pricePrecision = ServiceExtensions.PriceRoundingAccuracy(instrument);
+
+        PlaceOrderResult orderResult;
+        if (_exchangeServiceConfig.Fixed)
+        {
+            orderResult = await PlaceFixedOrder(side, currency, cost, balance, leverage, qtyPrecision, pricePrecision,
+                takeProfit, stopLoss);
+        }
+        else
+        {
+            orderResult = await PlaceFloatingOrder(side, currency, cost, _exchangeServiceConfig.Risk, qtyPrecision,
+                pricePrecision, stopLoss);
+        }
 
 
         // Throw exception if order placement was unsuccessful
-        if (!openPositionRes.Success)
-            throw new Exception("Open position error:" + openPositionRes?.Error?.Message);
+        if (!orderResult.WebCallResult.Success)
+            throw new Exception("Open position error:" + orderResult?.WebCallResult?.Error?.Message);
 
-        if (openPositionRes.Data == null)
+        if (orderResult.WebCallResult?.Data == null)
             throw new Exception("OpenPosition.Data is null");
 
-        OrderId = openPositionRes.Data.Id;
-        Qty = qty;
+        OrderId = orderResult.WebCallResult.Data.Id;
+        Qty = orderResult.Qty;
     }
 
-    public async Task RequestOrder(bool longSide, CryptoCurrency currency, decimal? takeProfit = null, decimal? stopLoss = null)
+    public async Task RequestOrder(bool longSide, CryptoCurrency currency, decimal stopLoss,decimal? takeProfit = null)
     {
         // Check if bot already has a position open
         if (HasPosition)
@@ -494,8 +533,8 @@ internal class BrokerService
                 longSide ? Bybit.Net.Enums.OrderSide.Buy : Bybit.Net.Enums.OrderSide.Sell,
                 currency,
                 cost,
-                takeProfit,
-                stopLoss);
+                stopLoss,
+                takeProfit);
         }
         else
         {
@@ -535,5 +574,4 @@ internal class BrokerService
             _logger.LogWarning($"ClosePosition: Do not interact with finances, as the status is OFF");
         }
     }
-
 }
