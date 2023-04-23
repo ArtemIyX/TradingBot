@@ -8,6 +8,7 @@ using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Sockets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 using System.Configuration;
@@ -405,12 +406,15 @@ internal class BrokerService
         decimal stopLoss)
     {
         stopLoss = Math.Round((decimal)stopLoss, pricePrecision);
-        decimal stopLossDiffPercent = Math.Abs((cost - stopLoss) / stopLoss * 100);
-        decimal qty = Math.Round(risk / (stopLossDiffPercent * 100), qtyPrecision);
+        decimal stopLossDiffPercent = Math.Abs((cost - stopLoss) / stopLoss);
+        decimal value = risk / stopLossDiffPercent;
+        decimal qty = value / cost;
+        qty = Math.Round(qty, qtyPrecision);
+        value = Math.Round(value, pricePrecision);
         string slInfo = stopLoss.ToString(CultureInfo.InvariantCulture);
         
         _logger.LogInformation(
-            $"FLOATING Trade: {side}, QTY:{qty}$, {currency}. Enter: {cost}, TP: NA, SL: {slInfo}");
+            $"FLOATING Trade. |Risk: {risk}$| {side} | QTY:{qty} {currency}({value}$)| Enter: {cost}| TP: NA | SL: {slInfo}");
         
         _logger.LogWarning($"Placing trade on bybit...");
         // Place market order using ByBit API
@@ -445,7 +449,7 @@ internal class BrokerService
         string? slInfo = stopLoss == null ? "NA" : stopLoss.ToString();
         // Log trade details
         _logger.LogInformation(
-            $"FIXED Trade: {side}, QTY:{qty}$, {currency}. Enter: {cost}, TP: {tpInfo}, SL: {slInfo}");
+            $"FIXED Trade: {side}, QTY:{qty}{currency}({balance * percent * leverage}$). Enter: {cost}, TP: {tpInfo}, SL: {slInfo}");
 
         // Round take profit and stop loss prices to 2 decimal places
         if (takeProfit != null)
@@ -480,12 +484,12 @@ internal class BrokerService
         await ServiceExtensions.SyncTime(_logger);
 
         _logger.LogWarning($"Interacting with finances, as the status is ON");
-        await _bybitClient.UsdPerpetualApi.Account.SetLeverageAsync(currency.ToString(),
-            buyLeverage: _exchangeServiceConfig.Leverage, sellLeverage: _exchangeServiceConfig.Leverage);
+        //await _bybitClient.UsdPerpetualApi.Account.SetLeverageAsync(currency.ToString(),
+        //    buyLeverage: _exchangeServiceConfig.Leverage, sellLeverage: _exchangeServiceConfig.Leverage);
         _logger.LogInformation($"'{currency}' Set Leverage to {_exchangeServiceConfig.Leverage}x");
 
         // Retrieve bot's current balance and calculate trade amount
-        decimal balance = await GetUsdtFuturesBalance();
+        //decimal balance = await GetUsdtFuturesBalance();
         decimal leverage = _exchangeServiceConfig.Leverage;
         InstrumentInfoResult? instrument = await ServiceExtensions.GetInstrumentInfo(currency);
         int qtyPrecision = ServiceExtensions.QtyRoundingAccuaracy(instrument);
@@ -494,7 +498,7 @@ internal class BrokerService
         PlaceOrderResult orderResult;
         if (_exchangeServiceConfig.Fixed)
         {
-            orderResult = await PlaceFixedOrder(side, currency, cost, balance, leverage, qtyPrecision, pricePrecision,
+            orderResult = await PlaceFixedOrder(side, currency, cost, 100, leverage, qtyPrecision, pricePrecision,
                 takeProfit, stopLoss);
         }
         else
@@ -511,6 +515,9 @@ internal class BrokerService
         if (orderResult.WebCallResult?.Data == null)
             throw new Exception("OpenPosition.Data is null");
 
+        string orderJson = JsonConvert.SerializeObject(orderResult.WebCallResult.Data);
+        _logger.LogInformation($"Order details:\n {orderJson}");
+
         OrderId = orderResult.WebCallResult.Data.Id;
         Qty = orderResult.Qty;
     }
@@ -526,6 +533,8 @@ internal class BrokerService
 
         decimal cost = await GetAvgPrice(currency);
         Enter = cost;
+
+        
 
         if (_exchangeServiceConfig.Status)
         {
