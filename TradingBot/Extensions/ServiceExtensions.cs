@@ -13,6 +13,14 @@ public static class ServiceExtensions
 {
     public static CryptoCurrency ToCrtypoCurrency(this string? input)
     {
+        if(string.IsNullOrEmpty(input))
+        {
+            return CryptoCurrency.None;
+        }
+        if (input.EndsWith(".P"))
+        {
+            input = input.Substring(0, input.Length - 2); // remove the last two characters (".P")
+        }
         if (Enum.TryParse(input, out CryptoCurrency currency))
         {
             return currency;

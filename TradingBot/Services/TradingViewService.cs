@@ -11,14 +11,12 @@ namespace TradingBot.Services
     {
         public bool Buy { get; set; }
         public CryptoCurrency Currency { get; set; }
-    }
-
-    public class StrategyAdvancedAction : StrategyAction
-    {
+        
         public decimal Take { get; set; }
-        public decimal Loss { get; set; }
-        public decimal PipSize { get; set; }
+        
+        public decimal Stop { get; set; }
     }
+    
 
 
     public delegate Task StrategyActionDelegate(object? sender, StrategyAction action);
@@ -91,10 +89,12 @@ namespace TradingBot.Services
                     bool buy = request.Action == "BUY";
                     _exucuting = true;
 
-                    OnAction?.Invoke(this, new StrategyAction()
+                    OnAction.Invoke(this, new StrategyAction
                     {
                         Buy = buy,
                         Currency = currency,
+                        Take = request.Take,
+                        Stop = request.Stop
                     });
                 }
                 else if(request.Action == "BUY_CANCEL" || request.Action == "SELL_CANCEL")
@@ -102,10 +102,12 @@ namespace TradingBot.Services
                     bool buy = request.Action == "BUY_CANCEL";
                     _exucuting = true;
 
-                    OnStop?.Invoke(this, new StrategyAction()
+                    OnStop.Invoke(this, new StrategyAction
                     {
                         Buy = buy,
                         Currency = currency,
+                        Take = request.Take,
+                        Stop = request.Stop
                     });
                 }
                 else

@@ -16,16 +16,11 @@ namespace TradingBot.Data.Config
 
         public string? WebhookUrl { get; set; }
         public string? SecretKey { get; set; }
-
-        public int RecentLen { get; set; }
-        public string RecentTF { get; set; }
+        
 
         public bool Cancel { get; set; }
         
-        public bool PutTakeProfit { get; set; }
-        public decimal TakeProfitRatio { get; set; }
         
-        public decimal Risk { get; set; }
     }
     
 }

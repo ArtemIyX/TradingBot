@@ -81,7 +81,7 @@ namespace TradingBot.Services
                 await _telegramBot.SendStopLoss(result.Buy, result.Currency, timeTaken, enterPrice, exitPrice);
             }
         }
-        private async Task ProcessBuyAction(CryptoCurrency currency)
+        private async Task ProcessBuyAction(CryptoCurrency currency, decimal sl, decimal tp)
         {
             
             // Check if the bot already has a BUY position with the same currency
@@ -104,8 +104,6 @@ namespace TradingBot.Services
             {
                 _logger.LogInformation("Bot is free, reqeusting BUY position");
                 decimal currentPrice = await _brokerService.GetAvgPrice(currency);
-                decimal sl = await _brokerService.CalculateStopLoss(Bybit.Net.Enums.OrderSide.Buy, currency);
-                decimal? tp = _brokerService.CalculateTakeProfit(Bybit.Net.Enums.OrderSide.Buy, currentPrice, sl);
                 await _brokerService.RequestBuy(currency, sl, tp);
                 await _telegramBot.SendLong(currency, currentPrice, tp, sl);
             }
@@ -154,7 +152,7 @@ namespace TradingBot.Services
             return;
         }
 
-        private async Task ProcessSellAction(CryptoCurrency currency)
+        private async Task ProcessSellAction(CryptoCurrency currency, decimal sl, decimal tp)
         {
             // Check if bot has a SELL position with the same currency
             if (_brokerService.HasPosition && !_brokerService.Buy && _brokerService.CurrentCurrency == currency)
@@ -174,8 +172,6 @@ namespace TradingBot.Services
             {
                 _logger.LogInformation("Bot is free, requesting SELL position");
                 decimal currentPrice = await _brokerService.GetAvgPrice(currency);
-                decimal sl = await _brokerService.CalculateStopLoss(Bybit.Net.Enums.OrderSide.Sell, currency);
-                decimal? tp = _brokerService.CalculateTakeProfit(Bybit.Net.Enums.OrderSide.Sell, currentPrice, sl);
                 await _brokerService.RequestSell(currency, sl, tp);
                 // Send a message to Telegram
                 await _telegramBot.SendShort(currency, currentPrice, tp, sl);
@@ -194,11 +190,11 @@ namespace TradingBot.Services
 
             if (action.Buy)
             {
-                await ProcessBuyAction(action.Currency);
+                await ProcessBuyAction(action.Currency, action.Stop, action.Take);
             }
             else
             {
-                await ProcessSellAction(action.Currency);
+                await ProcessSellAction(action.Currency, action.Stop, action.Take);
             }
 
 
