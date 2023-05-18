@@ -484,8 +484,8 @@ internal class BrokerService
         await ServiceExtensions.SyncTime(_logger);
 
         _logger.LogWarning($"Interacting with finances, as the status is ON");
-        //await _bybitClient.UsdPerpetualApi.Account.SetLeverageAsync(currency.ToString(),
-        //    buyLeverage: _exchangeServiceConfig.Leverage, sellLeverage: _exchangeServiceConfig.Leverage);
+        await _bybitClient.UsdPerpetualApi.Account.SetLeverageAsync(currency.ToString(),
+            buyLeverage: _exchangeServiceConfig.Leverage, sellLeverage: _exchangeServiceConfig.Leverage);
         _logger.LogInformation($"'{currency}' Set Leverage to {_exchangeServiceConfig.Leverage}x");
 
         // Retrieve bot's current balance and calculate trade amount
@@ -496,6 +496,7 @@ internal class BrokerService
         int pricePrecision = ServiceExtensions.PriceRoundingAccuracy(instrument);
         
         stopLoss = Math.Round((decimal)stopLoss, pricePrecision);
+        takeProfit = Math.Round((decimal)takeProfit, pricePrecision);
         decimal stopLossDiffPercent = Math.Abs((cost - stopLoss) / stopLoss);
         decimal risk = _exchangeServiceConfig.Risk;
         decimal value = risk / stopLossDiffPercent;
